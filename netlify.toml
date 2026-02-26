@@ -1,0 +1,7 @@
+[build]
+  publish = "games/survivor_game"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
