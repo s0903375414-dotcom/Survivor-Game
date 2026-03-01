@@ -1,12 +1,4 @@
 {
-  "name": "survivor-game-server",
-  "private": true,
-  "engines": {
-    "node": ">=18"
-  },
-  "scripts": {
-    "start": "node survivor_game/server.js"
-  },
   "dependencies": {
     "ws": "^8.19.0"
   }

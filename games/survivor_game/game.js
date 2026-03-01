@@ -36,7 +36,7 @@ const displayUserName = document.getElementById('display-user-name');
 const displayUid = document.getElementById('display-uid');
 
 // Google Login Client ID (請替換為您自己的 Google Client ID)
-const GOOGLE_CLIENT_ID = "643599361893-kfpu7q0kcl6gfij0j32engfq2r76g9kg.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "643599361893-ss0eobqotk8p53lkpatma6177d10e8dp.apps.googleusercontent.com";
 
 // Feedback UI Elements
 const feedbackModal = document.getElementById('feedback-modal');
@@ -53,6 +53,7 @@ const accountSettingsModal = document.getElementById('account-settings-modal');
 const closeAccountSettingsBtn = document.getElementById('close-account-settings-btn');
 const accountRenameBtn = document.getElementById('account-rename-btn');
 const newUsernameInput = document.getElementById('new-username');
+const bindingStatus = document.getElementById('binding-status');
 
 // Level Up UI
 const levelupModal = document.getElementById('levelup-modal');
@@ -138,10 +139,13 @@ const resumeAudio = async () => {
 window.addEventListener('mousedown', resumeAudio);
 window.addEventListener('keydown', resumeAudio);
 
-const gamePlaylist = ['connect_the_world.ogg']; // Only include existing for stability
+const gamePlaylist = [
+    'In-game music/AnyConv.com__【Estella】PYKAMIA - Fantasia Sonata Estella.ogg',
+    'In-game music/AnyConv.com__【Milthm】PYKAMIA - Fantasia Sonata Arcadia.ogg'
+];
 let currentTrackIndex = 0;
 
-const menuPlaylist = ['menu_theme.mp3']; // Only include existing for stability
+const menuPlaylist = ['menu_theme/menu_theme.mp3'];
 let currentMenuTrackIndex = 0;
 
 function playSound(type) {
@@ -446,6 +450,32 @@ function migrateUserProgress(oldName, newName) {
     });
 }
 
+function isCurrentUserBound() {
+    try {
+        const raw = localStorage.getItem('survivor_google_bindings');
+        const bindings = raw ? JSON.parse(raw) : {};
+        if (!currentUser) return false;
+        const entries = Object.entries(bindings);
+        for (const [, v] of entries) {
+            if (v && v.username === currentUser.username && v.uid === currentUser.uid) return true;
+        }
+        return false;
+    } catch {
+        return false;
+    }
+}
+
+function updateBindingUI() {
+    const bound = isCurrentUserBound();
+    if (bindingStatus) {
+        bindingStatus.textContent = bound ? '綁定狀態：已綁定' : '綁定狀態：未綁定';
+    }
+    const bindContainer = document.getElementById('google-bind-container');
+    if (bindContainer) {
+        bindContainer.style.display = bound ? 'none' : 'flex';
+    }
+}
+
 function handleAccountRename() {
     const newName = (newUsernameInput ? newUsernameInput.value.trim() : '').slice(0, 20);
     if (!currentUser || !newName) { alert('請輸入新的名稱'); return; }
@@ -471,7 +501,8 @@ function handleAccountRename() {
     loadMetaProgress();
     updateUserUI();
     if (accountSettingsModal) accountSettingsModal.classList.add('hidden');
-    alert('名稱已更新並綁定成功');
+    updateBindingUI();
+    alert(isCurrentUserBound() ? '名稱已更新（已綁定）' : '名稱已更新');
 }
 function handleLogin() {
     // 直接從 DOM 獲取最新數值，確保抓得到內容
@@ -646,6 +677,8 @@ function initGoogleLogin() {
     );
     const bindContainer = document.getElementById("google-bind-container");
     if (bindContainer) {
+        const bound = isCurrentUserBound();
+        bindContainer.style.display = bound ? 'none' : 'flex';
         google.accounts.id.renderButton(
             bindContainer,
             { 
@@ -1152,6 +1185,7 @@ setInterval(() => {
         accountSettingsBtn.onclick = () => {
             if (accountSettingsModal) accountSettingsModal.classList.remove('hidden');
             if (newUsernameInput && currentUser) newUsernameInput.value = currentUser.username || '';
+            updateBindingUI();
         };
     }
     if (closeAccountSettingsBtn) {
@@ -3213,10 +3247,13 @@ if (musicEnabled) {
 
 function ensureMenuMusicNode() {
     if (!menuAudio) {
-        menuAudio = new Audio(menuPlaylist[currentMenuTrackIndex]);
+        menuAudio = new Audio(encodeURI(menuPlaylist[currentMenuTrackIndex]));
+        menuAudio.crossOrigin = 'anonymous';
+        menuAudio.preload = 'auto';
+        menuAudio.volume = 1.0;
         menuAudio.onended = () => {
             currentMenuTrackIndex = (currentMenuTrackIndex + 1) % menuPlaylist.length;
-            menuAudio.src = menuPlaylist[currentMenuTrackIndex];
+            menuAudio.src = encodeURI(menuPlaylist[currentMenuTrackIndex]);
             menuAudio.play().catch(err => {
                 console.error("Menu music next track failed:", err);
             });
@@ -3235,10 +3272,13 @@ function ensureMenuMusicNode() {
 
 function ensureGameMusicNode() {
     if (!gameAudio) {
-        gameAudio = new Audio(gamePlaylist[currentTrackIndex]);
+        gameAudio = new Audio(encodeURI(gamePlaylist[currentTrackIndex]));
+        gameAudio.crossOrigin = 'anonymous';
+        gameAudio.preload = 'auto';
+        gameAudio.volume = 1.0;
         gameAudio.onended = () => {
             currentTrackIndex = (currentTrackIndex + 1) % gamePlaylist.length;
-            gameAudio.src = gamePlaylist[currentTrackIndex];
+            gameAudio.src = encodeURI(gamePlaylist[currentTrackIndex]);
             gameAudio.play().catch(err => {
                 console.error("Game music next track failed:", err);
             });
@@ -3268,10 +3308,10 @@ function startMenuMusic() {
     if (menuGainNode) {
         menuGainNode.gain.cancelScheduledValues(now);
         menuGainNode.gain.setValueAtTime(0, now);
-        menuGainNode.gain.linearRampToValueAtTime(0.4, now + 2);
+        menuGainNode.gain.linearRampToValueAtTime(0.6, now + 1.5);
     }
     
-    menuAudio.play().then(() => {
+    (menuAudio.play ? menuAudio.play() : Promise.resolve()).then(() => {
         console.log("Menu music playing...");
     }).catch(err => {
         console.error("Menu music play error:", err);
@@ -3301,10 +3341,12 @@ function startBackgroundMusic() {
     if (gameGainNode) {
         gameGainNode.gain.cancelScheduledValues(now);
         gameGainNode.gain.setValueAtTime(0, now);
-        gameGainNode.gain.linearRampToValueAtTime(0.4, now + 2);
+        gameGainNode.gain.linearRampToValueAtTime(0.6, now + 1.5);
     }
     gameAudio.currentTime = 0;
-    gameAudio.play().catch(() => {});
+    (gameAudio.play ? gameAudio.play() : Promise.resolve()).catch((e) => {
+        console.error("Game music play error:", e);
+    });
 }
 
 function stopBackgroundMusic() {
