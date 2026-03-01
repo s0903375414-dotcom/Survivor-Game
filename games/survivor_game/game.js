@@ -36,7 +36,7 @@ const displayUserName = document.getElementById('display-user-name');
 const displayUid = document.getElementById('display-uid');
 
 // Google Login Client ID (請替換為您自己的 Google Client ID)
-const GOOGLE_CLIENT_ID = "103758866274-k1l8dsktav75bafjl0m5i4u7b0g3hvto.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "643599361893-kfpu7q0kcl6gfij0j32engfq2r76g9kg.apps.googleusercontent.com";
 
 // Feedback UI Elements
 const feedbackModal = document.getElementById('feedback-modal');
