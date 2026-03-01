@@ -18,6 +18,44 @@
             </div>
         </div>
 
+        <div id="tutorial-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>新手教學</h2>
+                    <button id="close-tutorial-btn" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="room-list-container" style="gap:10px">
+                        <div class="room-list-header">
+                            <span>操作</span>
+                            <span>按鍵</span>
+                            <span>說明</span>
+                        </div>
+                        <div class="room-list">
+                            <div class="room-list-item">
+                                <span>移動</span><span>WASD / 方向鍵</span><span>持續移動以拉扯距離</span>
+                            </div>
+                            <div class="room-list-item">
+                                <span>瞄準</span><span>滑鼠</span><span>指向目標自動射擊</span>
+                            </div>
+                            <div class="room-list-item">
+                                <span>空襲支援</span><span>SPACE</span><span>計時冷卻後可呼叫打擊</span>
+                            </div>
+                            <div class="room-list-item">
+                                <span>暫停/選單</span><span>ESC / P</span><span>開啟暫停選單</span>
+                            </div>
+                            <div class="room-list-item">
+                                <span>音樂開關</span><span>M</span><span>切換背景音樂</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="modal-tip">完成教學後即可開始你的第一場行動。</p>
+                    <div style="display:flex;justify-content:center;margin-top:12px">
+                        <button id="tutorial-continue-btn" class="action-btn endless-btn">我知道了</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div id="stats">
             <div class="stat-item">LEVEL: <span id="level-display">1</span></div>
             <div class="stat-item">SCORE: <span id="score-display">0</span></div>
@@ -100,6 +138,7 @@
                             <li>初始化強化：改善音樂淡入與音量設定，首次互動後穩定播放</li>
                             <li>帳號管理：新增更名功能與綁定狀態顯示，Google 綁定自動回復進度</li>
                             <li>安全設定：更新 Google Client ID 與 Origins 建議配置</li>
+                            <li>新手教學：新註冊或首次登入顯示教學面板，完成後不再顯示</li>
                         </ul>
                     </div>
                     <div class="changelog-item">
