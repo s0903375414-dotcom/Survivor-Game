@@ -54,6 +54,14 @@ const closeAccountSettingsBtn = document.getElementById('close-account-settings-
 const accountRenameBtn = document.getElementById('account-rename-btn');
 const newUsernameInput = document.getElementById('new-username');
 const bindingStatus = document.getElementById('binding-status');
+const replayTutorialBtn = document.getElementById('replay-tutorial-btn');
+const tutorialModal = document.getElementById('tutorial-modal');
+const tutorialContinueBtn = document.getElementById('tutorial-continue-btn');
+const closeTutorialBtn = document.getElementById('close-tutorial-btn');
+const commanderGuide = document.getElementById('commander-guide');
+const guideText = document.getElementById('guide-text');
+const guideNextBtn = document.getElementById('guide-next-btn');
+const guideSkipBtn = document.getElementById('guide-skip-btn');
 
 // Level Up UI
 const levelupModal = document.getElementById('levelup-modal');
@@ -437,6 +445,80 @@ function saveUserSession() {
     }
 }
 
+function tutorialKey() {
+    if (!currentUser) return null;
+    return `survivor_tutorial_done_${currentUser.uid}`;
+}
+
+function showTutorialIfNeeded() {
+    const k = tutorialKey();
+    if (!k) return;
+    const done = localStorage.getItem(k);
+    if (!done && tutorialModal) {
+        tutorialModal.classList.remove('hidden');
+    }
+}
+
+function resetTutorial() {
+    const k = tutorialKey();
+    if (!k) return;
+    localStorage.removeItem(k);
+    if (tutorialModal) {
+        tutorialModal.classList.remove('hidden');
+    }
+    tutorialGuide.active = false;
+    tutorialGuide.step = 0;
+    if (commanderGuide) commanderGuide.classList.add('hidden');
+}
+
+function markTutorialDone() {
+    const k = tutorialKey();
+    if (!k) return;
+    localStorage.setItem(k, '1');
+    if (tutorialModal) tutorialModal.classList.add('hidden');
+    if (commanderGuide) commanderGuide.classList.add('hidden');
+}
+let tutorialGuide = {
+    active: false,
+    step: 0,
+    lines: [
+        "指揮官，歡迎加入。我是本次行動的導引官，將協助你完成初次部署。",
+        "基本操作：以鍵盤 WASD 移動，滑鼠指向即可自動射擊。",
+        "現在進入戰區，熟悉射擊與走位。必要時按下空白鍵呼叫空襲支援。",
+        "保持距離、持續輸出，注意血量與經驗球。達到升級時選擇系統強化。",
+        "行動結束後會結算軍資並更新戰績。祝你旗開得勝。"
+    ],
+    show(text) {
+        if (commanderGuide && guideText) {
+            guideText.textContent = text;
+            commanderGuide.classList.remove('hidden');
+        }
+        try { playRadioVoice(text); } catch {}
+    },
+    start() {
+        this.active = true;
+        this.step = 0;
+        this.show(this.lines[this.step]);
+    },
+    next() {
+        if (!this.active) return;
+        this.step++;
+        if (this.step === 2) {
+            showMainMenu();
+            startGame();
+        }
+        if (this.step >= this.lines.length) {
+            this.active = false;
+            markTutorialDone();
+        } else {
+            this.show(this.lines[this.step]);
+        }
+    },
+    skip() {
+        this.active = false;
+        markTutorialDone();
+    }
+};
 function migrateUserProgress(oldName, newName) {
     const bases = ['survivor_funds', 'survivor_units_owned', 'survivor_units_equipped'];
     bases.forEach(b => {
@@ -575,6 +657,7 @@ function handleLogin() {
     
     alert(`驗證成功，${currentUser.username} 指揮官已登入！`);
     renderLeaderboard(); 
+    showTutorialIfNeeded();
 }
 
 function handleGoogleLogin(response) {
@@ -644,6 +727,7 @@ function handleGoogleLogin(response) {
         
         alert(`Google 登入成功！歡迎回來，${currentUser.username} 指揮官。`);
         renderLeaderboard();
+        showTutorialIfNeeded();
     } catch (err) {
         console.error("Google 登入解析失敗:", err);
         alert("Google 登入失敗，請稍後再試。");
@@ -1088,6 +1172,9 @@ function checkSavedUser() {
         loadMetaProgress();
     }
     updateUserUI(); 
+    if (currentUser) {
+        try { showTutorialIfNeeded(); } catch {}
+    }
 }
 
 // 移除原本底部的分散呼叫，統一由 checkSavedUser 處理初始化
@@ -1196,6 +1283,29 @@ setInterval(() => {
     if (accountRenameBtn) {
         accountRenameBtn.onclick = handleAccountRename;
     }
+    if (replayTutorialBtn) {
+        replayTutorialBtn.onclick = () => {
+            if (!currentUser) {
+                alert('請先登入帳號後再重新觀看新手教學。');
+                return;
+            }
+            resetTutorial();
+        };
+    }
+    if (tutorialContinueBtn) {
+        tutorialContinueBtn.onclick = () => {
+            if (tutorialModal) tutorialModal.classList.add('hidden');
+            tutorialGuide.start();
+        };
+    }
+    if (closeTutorialBtn) {
+        closeTutorialBtn.onclick = () => {
+            if (tutorialModal) tutorialModal.classList.add('hidden');
+            tutorialGuide.start();
+        };
+    }
+    if (guideNextBtn) guideNextBtn.onclick = () => tutorialGuide.next();
+    if (guideSkipBtn) guideSkipBtn.onclick = () => tutorialGuide.skip();
 })();
 
 // Utility Functions

@@ -56,6 +56,20 @@
                 </div>
             </div>
         </div>
+        <div id="commander-guide" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>導引官</h2>
+                    <button id="guide-skip-btn" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="guide-text" style="min-height:80px; line-height:1.6;"></div>
+                    <div style="display:flex;justify-content:center;margin-top:12px">
+                        <button id="guide-next-btn" class="action-btn endless-btn">繼續</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div id="stats">
             <div class="stat-item">LEVEL: <span id="level-display">1</span></div>
             <div class="stat-item">SCORE: <span id="score-display">0</span></div>
@@ -109,6 +123,9 @@
                     </button>
                     <button id="account-settings-btn" class="small-btn">
                         <span class="icon">🛠️</span> 帳號管理
+                    </button>
+                    <button id="replay-tutorial-btn" class="small-btn">
+                        <span class="icon">📘</span> 重新新手教學
                     </button>
                     <button id="logout-btn" class="small-btn hidden">
                         <span class="icon">⬅️</span> 登出帳號
