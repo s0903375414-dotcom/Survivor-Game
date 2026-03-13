@@ -29,6 +29,8 @@ const loginModal = document.getElementById('login-modal');
 const loginTriggerBtn = document.getElementById('login-trigger-btn');
 const closeLoginBtn = document.getElementById('close-login-btn');
 const authSubmitBtn = document.getElementById('auth-submit-btn');
+const registerSubmitBtn = document.getElementById('register-submit-btn');
+const guestContinueBtn = document.getElementById('guest-continue-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
@@ -84,6 +86,7 @@ const roomListContainer = document.getElementById('room-list');
 const closeLobbyBtn = document.getElementById('close-lobby-btn');
 const createRoomBtn = document.getElementById('create-room-btn');
 const refreshLobbyBtn = document.getElementById('refresh-lobby-btn');
+const multiplayerBtn = document.getElementById('multiplayer-btn');
 
 // Game State
 let currentUser = null;
@@ -155,6 +158,17 @@ let currentTrackIndex = 0;
 
 const menuPlaylist = ['menu_theme/menu_theme.mp3'];
 let currentMenuTrackIndex = 0;
+
+let loginDemoCtx = null;
+let loginDemoLastTime = 0;
+let loginDemoEntities = [];
+let loginDemoAnimationId = null;
+
+let menuBgActive = false;
+let menuBgAnimationId = null;
+let menuBgLastTime = 0;
+let menuBgEntities = [];
+let menuBgPlayer = null;
 
 function playSound(type) {
     if (audioCtx.state === 'suspended') {
@@ -426,12 +440,6 @@ window.addEventListener('keyup', (e) => {
 });
 
 startBtn.addEventListener('click', startGame);
-if (multiplayerBtn) {
-    multiplayerBtn.addEventListener('click', () => {
-        lobbyModal.classList.remove('hidden');
-        multiplayer.connect();
-    });
-}
 restartBtn.addEventListener('click', startGame);
 menuBtn.addEventListener('click', showMainMenu);
 
@@ -468,7 +476,10 @@ function resetTutorial() {
     }
     tutorialGuide.active = false;
     tutorialGuide.step = 0;
-    if (commanderGuide) commanderGuide.classList.add('hidden');
+    if (commanderGuide) {
+        commanderGuide.classList.add('hidden');
+        commanderGuide.classList.remove('talking');
+    }
 }
 
 function markTutorialDone() {
@@ -476,7 +487,10 @@ function markTutorialDone() {
     if (!k) return;
     localStorage.setItem(k, '1');
     if (tutorialModal) tutorialModal.classList.add('hidden');
-    if (commanderGuide) commanderGuide.classList.add('hidden');
+    if (commanderGuide) {
+        commanderGuide.classList.add('hidden');
+        commanderGuide.classList.remove('talking');
+    }
 }
 let tutorialGuide = {
     active: false,
@@ -492,6 +506,9 @@ let tutorialGuide = {
         if (commanderGuide && guideText) {
             guideText.textContent = text;
             commanderGuide.classList.remove('hidden');
+            commanderGuide.classList.remove('talking');
+            void commanderGuide.offsetWidth;
+            commanderGuide.classList.add('talking');
         }
         try { playRadioVoice(text); } catch {}
     },
@@ -586,7 +603,7 @@ function handleAccountRename() {
     updateBindingUI();
     alert(isCurrentUserBound() ? '名稱已更新（已綁定）' : '名稱已更新');
 }
-function handleLogin() {
+function handleLogin(mode = 'login') {
     // 直接從 DOM 獲取最新數值，確保抓得到內容
     const usernameEl = document.getElementById('username');
     const passwordEl = document.getElementById('password');
@@ -602,28 +619,28 @@ function handleLogin() {
     const accountsRaw = localStorage.getItem('survivor_accounts');
     let accounts = accountsRaw ? JSON.parse(accountsRaw) : {};
 
-    // Special Case: Dev Account (支援 Dev 與 開發人員)
-    if (username === 'Dev' || username === '開發人員' || username === 'Developer' || username === 'Admin') {
+    // Special Case: Dev Account (支援 Dev 與 開發人員) 僅適用於登入
+    if (mode === 'login' && (username === 'Dev' || username === '開發人員' || username === 'Developer' || username === 'Admin')) {
         currentUser = { username: '開發團隊', uid: 'DEV_001', isAdmin: true };
-        saveUserSession();
-        loadMetaProgress();
-        updateUserUI();
-        loginModal.classList.add('hidden');
-        alert(`歡迎回來，${currentUser.username} 指揮官！`);
-        renderLeaderboard();
-        return;
-    }
-
-    // Check if account exists
-    if (accounts[username]) {
-        // Login Flow
+    } else if (mode === 'login') {
+        if (!accounts[username]) {
+            alert('找不到此帳號，請確認輸入或改用註冊。');
+            return;
+        }
         if (accounts[username].password !== password) {
-            alert('錯誤：帳號名已被使用，或是密碼輸入錯誤！');
+            alert('密碼錯誤，請再試一次。');
             return;
         }
         currentUser = accounts[username].user;
-    } else {
-        // Registration Flow (New Account)
+    } else if (mode === 'register') {
+        if (['Dev','開發人員','Developer','Admin','開發團隊'].includes(username)) {
+            alert('此名稱為保留代號，無法註冊使用。');
+            return;
+        }
+        if (accounts[username]) {
+            alert('此帳號名稱已被使用，請改用其他名稱或直接登入。');
+            return;
+        }
         let hash = 0;
         for (let i = 0; i < username.length; i++) {
             hash = ((hash << 5) - hash) + username.charCodeAt(i);
@@ -635,14 +652,15 @@ function handleLogin() {
         currentUser = { username, uid, isAdmin: false };
         accounts[username] = { password, user: currentUser };
         
-        // Save to database
         localStorage.setItem('survivor_accounts', JSON.stringify(accounts));
         
-        // Force reset progress for NEW account (No reading previous local saves)
         const prefix = `_${username}`;
         localStorage.removeItem(`survivor_funds${prefix}`);
         localStorage.removeItem(`survivor_units_owned${prefix}`);
         localStorage.removeItem(`survivor_units_equipped${prefix}`);
+    } else {
+        alert('未知的登入模式');
+        return;
     }
     
     saveUserSession();
@@ -655,9 +673,23 @@ function handleLogin() {
     usernameInput.value = '';
     passwordInput.value = '';
     
-    alert(`驗證成功，${currentUser.username} 指揮官已登入！`);
+    if (mode === 'register') {
+        alert(`註冊成功，${currentUser.username} 指揮官已建立帳號並登入！`);
+    } else {
+        alert(`登入成功，${currentUser.username} 指揮官已登入！`);
+    }
     renderLeaderboard(); 
     showTutorialIfNeeded();
+}
+
+function continueAsGuest() {
+    currentUser = null;
+    saveUserSession();
+    loadMetaProgress();
+    updateUserUI();
+    loginModal.classList.add('hidden');
+    renderLeaderboard();
+    alert('已使用訪客身份繼續，目前進度將儲存在本機。');
 }
 
 function handleGoogleLogin(response) {
@@ -1056,6 +1088,258 @@ function loadMetaProgress() {
     updateFundsUI();
 }
 
+function initLoginDemo() {
+    const canvasEl = document.getElementById('login-demo-canvas');
+    if (!canvasEl) return;
+    const container = canvasEl.parentElement;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const scale = window.devicePixelRatio || 1;
+    canvasEl.width = rect.width * scale;
+    canvasEl.height = rect.height * scale;
+    const c = canvasEl.getContext('2d');
+    if (!c) return;
+    loginDemoCtx = c;
+    loginDemoCtx.setTransform(scale, 0, 0, scale, 0, 0);
+    loginDemoEntities = [];
+    for (let i = 0; i < 6; i++) {
+        loginDemoEntities.push({
+            type: 'enemy',
+            x: rect.width * (0.2 + Math.random() * 0.6),
+            y: rect.height * (0.2 + Math.random() * 0.6),
+            vx: (Math.random() - 0.5) * 40,
+            vy: (Math.random() - 0.5) * 40,
+            r: 10 + Math.random() * 8
+        });
+    }
+    loginDemoEntities.push({
+        type: 'player',
+        x: rect.width * 0.25,
+        y: rect.height * 0.6,
+        r: 12,
+        angle: -Math.PI / 2
+    });
+    if (loginDemoAnimationId) cancelAnimationFrame(loginDemoAnimationId);
+    loginDemoLastTime = 0;
+    loginDemoAnimationId = requestAnimationFrame(loginDemoLoop);
+}
+
+function loginDemoLoop(timestamp) {
+    if (!loginDemoCtx) return;
+    const rect = loginDemoCtx.canvas.getBoundingClientRect();
+    if (!loginDemoLastTime) loginDemoLastTime = timestamp;
+    const dt = Math.min(0.05, (timestamp - loginDemoLastTime) / 1000);
+    loginDemoLastTime = timestamp;
+    const w = rect.width;
+    const h = rect.height;
+    const ctx2 = loginDemoCtx;
+    ctx2.clearRect(0, 0, w, h);
+    const g = ctx2.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.9);
+    g.addColorStop(0, 'rgba(0,255,255,0.25)');
+    g.addColorStop(1, 'rgba(0,0,0,1)');
+    ctx2.fillStyle = g;
+    ctx2.fillRect(0, 0, w, h);
+    const player = loginDemoEntities.find(e => e.type === 'player');
+    const enemies = loginDemoEntities.filter(e => e.type === 'enemy');
+    enemies.forEach(e => {
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+        if (e.x < 0 || e.x > w) e.vx *= -1;
+        if (e.y < 0 || e.y > h) e.vy *= -1;
+    });
+    let currentTarget = null;
+    if (player && enemies.length) {
+        currentTarget = enemies[Math.floor(timestamp / 900) % enemies.length];
+        const dx = currentTarget.x - player.x;
+        const dy = currentTarget.y - player.y;
+        player.angle = Math.atan2(dy, dx);
+        const t = (timestamp % 900) / 900;
+        const bx = player.x + Math.cos(player.angle) * 40 * t;
+        const by = player.y + Math.sin(player.angle) * 40 * t;
+        ctx2.strokeStyle = 'rgba(0,255,255,0.7)';
+        ctx2.lineWidth = 2;
+        ctx2.beginPath();
+        ctx2.moveTo(player.x, player.y);
+        ctx2.lineTo(bx, by);
+        ctx2.stroke();
+        if (t > 0.9) {
+            ctx2.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx2.beginPath();
+            ctx2.arc(currentTarget.x, currentTarget.y, currentTarget.r * 1.5, 0, Math.PI * 2);
+            ctx2.fill();
+        }
+    }
+    enemies.forEach(e => {
+        ctx2.save();
+        ctx2.translate(e.x, e.y);
+        ctx2.scale(1.15, 0.9);
+        ctx2.beginPath();
+        ctx2.arc(0, 0, e.r, Math.PI, 0, false);
+        ctx2.arc(0, 0, e.r * 0.85, 0, Math.PI, true);
+        ctx2.closePath();
+        ctx2.fillStyle = 'rgba(80,255,140,0.85)';
+        ctx2.shadowBlur = 18;
+        ctx2.shadowColor = '#00ff88';
+        ctx2.fill();
+        ctx2.shadowBlur = 0;
+        ctx2.fillStyle = 'rgba(0,80,40,0.9)';
+        ctx2.beginPath();
+        ctx2.arc(-e.r * 0.35, -e.r * 0.15, e.r * 0.18, 0, Math.PI * 2);
+        ctx2.arc(e.r * 0.1, -e.r * 0.15, e.r * 0.18, 0, Math.PI * 2);
+        ctx2.fill();
+        ctx2.restore();
+    });
+    if (player) {
+        ctx2.save();
+        ctx2.translate(player.x, player.y);
+        ctx2.rotate(player.angle || 0);
+        ctx2.beginPath();
+        ctx2.moveTo(20, 0);
+        ctx2.lineTo(-10, 10);
+        ctx2.lineTo(-10, -10);
+        ctx2.closePath();
+        ctx2.fillStyle = 'rgba(66,165,255,0.95)';
+        ctx2.shadowBlur = 18;
+        ctx2.shadowColor = '#42a5ff';
+        ctx2.fill();
+        ctx2.shadowBlur = 0;
+        ctx2.fillStyle = 'rgba(46,120,255,0.9)';
+        ctx2.beginPath();
+        ctx2.moveTo(-4, 10);
+        ctx2.lineTo(-14, 18);
+        ctx2.lineTo(-8, 3);
+        ctx2.closePath();
+        ctx2.moveTo(-4, -10);
+        ctx2.lineTo(-14, -18);
+        ctx2.lineTo(-8, -3);
+        ctx2.closePath();
+        ctx2.fill();
+        ctx2.beginPath();
+        ctx2.arc(-4, 0, 6, 0, Math.PI * 2);
+        ctx2.fillStyle = 'rgba(15,35,80,0.95)';
+        ctx2.fill();
+        ctx2.restore();
+    }
+    loginDemoAnimationId = requestAnimationFrame(loginDemoLoop);
+}
+
+function startMenuBackground() {
+    if (menuBgActive) return;
+    menuBgActive = true;
+    menuBgEntities = [];
+    for (let i = 0; i < 12; i++) {
+        menuBgEntities.push({
+            type: 'slime',
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            vx: (Math.random() - 0.5) * 60,
+            vy: (Math.random() - 0.5) * 60,
+            r: 10 + Math.random() * 12
+        });
+    }
+    menuBgPlayer = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        angle: -Math.PI / 2
+    };
+    if (menuBgAnimationId) cancelAnimationFrame(menuBgAnimationId);
+    menuBgLastTime = 0;
+    menuBgAnimationId = requestAnimationFrame(menuBgLoop);
+}
+
+function stopMenuBackground() {
+    menuBgActive = false;
+    if (menuBgAnimationId) cancelAnimationFrame(menuBgAnimationId);
+}
+
+function menuBgLoop(timestamp) {
+    if (!menuBgActive) return;
+    if (!menuBgLastTime) menuBgLastTime = timestamp;
+    const dt = Math.min(0.05, (timestamp - menuBgLastTime) / 1000);
+    menuBgLastTime = timestamp;
+    ctx.fillStyle = '#05070d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawGrid();
+    if (menuBgPlayer) {
+        menuBgPlayer.angle += dt * 0.6;
+    }
+    let chosen = null;
+    if (menuBgPlayer && menuBgEntities.length) {
+        chosen = menuBgEntities[Math.floor(timestamp / 800) % menuBgEntities.length];
+    }
+    menuBgEntities.forEach(e => {
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+        if (e.x < -100) e.x = canvas.width + 100;
+        if (e.x > canvas.width + 100) e.x = -100;
+        if (e.y < -100) e.y = canvas.height + 100;
+        if (e.y > canvas.height + 100) e.y = -100;
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.scale(1.15, 0.85);
+        ctx.beginPath();
+        ctx.arc(0, 0, e.r, Math.PI, 0, false);
+        ctx.arc(0, 0, e.r * 0.85, 0, Math.PI, true);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(80,255,140,0.8)';
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = '#00ff88';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(0,80,40,0.9)';
+        ctx.beginPath();
+        ctx.arc(-e.r * 0.35, -e.r * 0.15, e.r * 0.2, 0, Math.PI * 2);
+        ctx.arc(e.r * 0.1, -e.r * 0.15, e.r * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    });
+    if (menuBgPlayer) {
+        ctx.save();
+        ctx.translate(menuBgPlayer.x, menuBgPlayer.y);
+        ctx.rotate(menuBgPlayer.angle);
+        ctx.beginPath();
+        ctx.moveTo(30, 0);
+        ctx.lineTo(-16, 12);
+        ctx.lineTo(-16, -12);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(66,165,255,0.95)';
+        ctx.shadowBlur = 22;
+        ctx.shadowColor = '#42a5ff';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(46,120,255,0.9)';
+        ctx.beginPath();
+        ctx.moveTo(-2, 12);
+        ctx.lineTo(-18, 22);
+        ctx.lineTo(-10, 4);
+        ctx.closePath();
+        ctx.moveTo(-2, -12);
+        ctx.lineTo(-18, -22);
+        ctx.lineTo(-10, -4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(-6, 0, 8, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(10,30,70,0.95)';
+        ctx.fill();
+        if (chosen) {
+            const dx = chosen.x - menuBgPlayer.x;
+            const dy = chosen.y - menuBgPlayer.y;
+            const len = Math.min(220, Math.hypot(dx, dy));
+            const bx = Math.cos(menuBgPlayer.angle) * len;
+            const by = Math.sin(menuBgPlayer.angle) * len;
+            ctx.strokeStyle = 'rgba(0,255,255,0.8)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(bx, by);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+    menuBgAnimationId = requestAnimationFrame(menuBgLoop);
+}
+
 function saveMetaProgress() {
     const prefix = currentUser ? `_${currentUser.username}` : '';
     localStorage.setItem(`survivor_funds${prefix}`, String(militaryFunds));
@@ -1172,8 +1456,10 @@ function checkSavedUser() {
         loadMetaProgress();
     }
     updateUserUI(); 
-    if (currentUser) {
-        try { showTutorialIfNeeded(); } catch {}
+    if (loginModal) {
+        loginModal.classList.remove('hidden');
+        try { initGoogleLogin(); } catch {}
+        try { initLoginDemo(); } catch {}
     }
 }
 
@@ -1213,13 +1499,22 @@ setInterval(() => {
     if (createRoomBtn) {
         createRoomBtn.onclick = () => {
             const roomName = prompt('請輸入房間名稱:', '戰區 ' + Math.floor(Math.random() * 100));
-            if (roomName) {
-                multiplayer.joinRoom(roomName, true);
-            }
+            if (!roomName) return;
+            const maxPlayersInput = prompt('設定房間最大人數 (2 ~ 8):', '4');
+            const maxPlayers = Math.min(8, Math.max(2, parseInt(maxPlayersInput || '4', 10) || 4));
+            const diffInput = prompt('設定房間難度倍率 (1 = 標準，建議 0.5 ~ 3):', '1');
+            const difficulty = Math.max(0.2, Math.min(5, parseFloat(diffInput || '1') || 1));
+            multiplayer.joinRoom(roomName, true, maxPlayers, difficulty);
         };
     }
     if (refreshLobbyBtn) {
         refreshLobbyBtn.onclick = () => multiplayer.requestRoomList();
+    }
+    if (multiplayerBtn && lobbyModal) {
+        multiplayerBtn.onclick = () => {
+            lobbyModal.classList.remove('hidden');
+            multiplayer.connect();
+        };
     }
     
     // Auth & Account Buttons
@@ -1227,11 +1522,23 @@ setInterval(() => {
     if (deleteAccountBtn) deleteAccountBtn.onclick = handleAccountDeletion;
     if (adminClearDataBtn) adminClearDataBtn.onclick = handleAdminClearData;
     
-    // 統一在這裡綁定登入按鈕
+    // 統一在這裡綁定登入 / 註冊 / 訪客按鈕
     if (authSubmitBtn) {
         authSubmitBtn.onclick = (e) => {
-            e.preventDefault(); // 防止可能的表單行為
-            handleLogin();
+            e.preventDefault();
+            handleLogin('login');
+        };
+    }
+    if (registerSubmitBtn) {
+        registerSubmitBtn.onclick = (e) => {
+            e.preventDefault();
+            handleLogin('register');
+        };
+    }
+    if (guestContinueBtn) {
+        guestContinueBtn.onclick = (e) => {
+            e.preventDefault();
+            continueAsGuest();
         };
     }
     
@@ -1239,6 +1546,7 @@ setInterval(() => {
         loginModal.classList.remove('hidden');
         // 每次開啟登入視窗都嘗試渲染一次按鈕，確保容器存在
         initGoogleLogin();
+        initLoginDemo();
     };
     if (closeLoginBtn) closeLoginBtn.onclick = () => loginModal.classList.add('hidden');
     
@@ -1426,14 +1734,19 @@ class MultiplayerManager {
         }, 5000);
     }
 
-    joinRoom(roomId, create = false) {
+    joinRoom(roomId, create = false, maxPlayers, difficulty) {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.socket.send(JSON.stringify({
+            const payload = {
                 type: 'join',
                 roomId,
                 create,
                 name: currentUser ? currentUser.username : '訪客'
-            }));
+            };
+            if (create) {
+                payload.maxPlayers = maxPlayers;
+                payload.difficulty = difficulty;
+            }
+            this.socket.send(JSON.stringify(payload));
         }
     }
 
@@ -3242,6 +3555,7 @@ function checkBossHint() {
 }
 
 function startGame() {
+    stopMenuBackground();
     init();
     gameRunning = true;
     startScreen.classList.add('hidden');
@@ -3255,6 +3569,7 @@ function startGame() {
 }
 
 function startMultiplayer() {
+    stopMenuBackground();
     init();
     gameRunning = true;
     startScreen.classList.add('hidden');
@@ -3342,14 +3657,13 @@ function showMainMenu() {
     if (unitModal) {
         unitModal.classList.add('hidden');
     }
+    startMenuBackground();
     stopBackgroundMusic();
     startMenuMusic();
 }
 
-// Initial Draw (Background)
 resizeCanvas();
-ctx.fillStyle = '#1a1a1a';
-ctx.fillRect(0, 0, canvas.width, canvas.height);
+startMenuBackground();
 if (musicEnabled) {
     startMenuMusic();
 }

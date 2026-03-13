@@ -309,10 +309,10 @@
 
                 <div class="menu-actions">
                     <button id="start-btn" class="action-btn endless-btn">
-                        <span class="icon">▶</span> 進入戰區 (Endless)
+                        <span class="icon">🎯</span> 單人戰區
                     </button>
                     <button id="multiplayer-btn" class="action-btn multiplayer-btn">
-                        <span class="icon">🌐</span> 多人連線 (Alpha)
+                        <span class="icon">🌐</span> 多人作戰
                     </button>
                     <div class="bottom-row">
                         <button id="unit-config-btn" class="action-btn unit-btn">單位配置</button>
@@ -336,26 +336,51 @@
 
         <!-- Login Modal -->
         <div id="login-modal" class="modal hidden">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>指揮官登入</h2>
-                    <button id="close-login-btn" class="close-btn">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="input-group">
-                        <label for="username">指揮官代號</label>
-                        <input type="text" id="username" placeholder="請輸入代號...">
+            <div class="modal-content login-modal-content">
+                <div class="login-layout">
+                    <div class="login-hero">
+                        <div class="login-hero-inner">
+                            <canvas id="login-demo-canvas"></canvas>
+                            <div class="login-hero-foreground">
+                                <img src="assets/commander_tutorial.jpg" alt="導引官" class="login-hero-image">
+                                <div class="login-hero-caption">
+                                    <div class="login-hero-title">SURVIVOR EVOLUTION</div>
+                                    <div class="login-hero-tagline">指揮官集結 · 守住最後防線</div>
+                                    <div class="login-hero-version">版本 v4.6.0</div>
+                                    <div class="login-hero-meta">
+                                        <div class="login-hero-meta-item">伺服器所在地：雲端資料中心</div>
+                                        <div class="login-hero-meta-item">推薦解析度：1920×1080 以上</div>
+                                        <div class="login-hero-meta-item">推薦瀏覽器：Chrome / Edge 最新版</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label for="password">通訊密碼</label>
-                        <input type="password" id="password" placeholder="請輸入密碼...">
+                    <div class="login-form-side">
+                        <div class="modal-header">
+                            <h2>指揮官登入</h2>
+                            <button id="close-login-btn" class="close-btn">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="input-group">
+                                <label for="username">指揮官代號</label>
+                                <input type="text" id="username" placeholder="請輸入代號...">
+                            </div>
+                            <div class="input-group">
+                                <label for="password">通訊密碼</label>
+                                <input type="password" id="password" placeholder="請輸入密碼...">
+                            </div>
+                            <button id="auth-submit-btn" class="action-btn endless-btn">登入</button>
+                            <button id="register-submit-btn" class="action-btn unit-btn" style="margin-top:8px;">註冊新帳號</button>
+                            <div class="auth-divider"><span>或使用訪客帳號繼續</span></div>
+                            <button id="guest-continue-btn" class="small-btn" style="margin-bottom:10px;">以訪客身份繼續</button>
+                            <div class="auth-divider"><span>或使用 Google 登入</span></div>
+                            <div id="google-login-container" style="display: flex; justify-content: center; margin-top: 10px;">
+                                <!-- Google Sign-In button will be rendered here -->
+                            </div>
+                            <p class="modal-tip">登入可同步雲端資料；訪客模式僅儲存在本機。</p>
+                        </div>
                     </div>
-                    <button id="auth-submit-btn" class="action-btn endless-btn">確認登入</button>
-                    <div class="auth-divider"><span>或使用 Google 登入</span></div>
-                    <div id="google-login-container" style="display: flex; justify-content: center; margin-top: 10px;">
-                        <!-- Google Sign-In button will be rendered here -->
-                    </div>
-                    <p class="modal-tip">首次登入將自動建立帳號</p>
                 </div>
             </div>
         </div>
