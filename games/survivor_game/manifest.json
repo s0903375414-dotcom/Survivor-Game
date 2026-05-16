@@ -1,0 +1,18 @@
+{
+  "name": "Survivor Game",
+  "short_name": "Survivor",
+  "description": "生存者遊戲：戰術指令集",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "assets/commander_tutorial.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

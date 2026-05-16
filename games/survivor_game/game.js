@@ -1,6 +1,15 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker registered'))
+            .catch(err => console.log('Service Worker registration failed', err));
+    });
+}
+
 // UI Elements
 const hpDisplay = document.getElementById('hp-display');
 const scoreDisplay = document.getElementById('score-display');
@@ -28,14 +37,31 @@ const adminViewFeedbackBtn = document.getElementById('admin-view-feedback-btn');
 const loginModal = document.getElementById('login-modal');
 const loginTriggerBtn = document.getElementById('login-trigger-btn');
 const closeLoginBtn = document.getElementById('close-login-btn');
-const authSubmitBtn = document.getElementById('auth-submit-btn');
-const registerSubmitBtn = document.getElementById('register-submit-btn');
 const guestContinueBtn = document.getElementById('guest-continue-btn');
 const logoutBtn = document.getElementById('logout-btn');
-const usernameInput = document.getElementById('username');
-const passwordInput = document.getElementById('password');
 const displayUserName = document.getElementById('display-user-name');
 const displayUid = document.getElementById('display-uid');
+
+const btnSubmitLogin = document.getElementById('btn-submit-login');
+const btnGotoRegister = document.getElementById('btn-goto-register');
+const btnRegNext = document.getElementById('btn-reg-next');
+const btnBacktoLogin = document.getElementById('btn-backto-login');
+const btnRegSubmit = document.getElementById('btn-reg-submit');
+const btnRegBack = document.getElementById('btn-reg-back');
+const btnSubmitMigration = document.getElementById('btn-submit-migration');
+const btnCancelMigration = document.getElementById('btn-cancel-migration');
+
+const loginEmailInput = document.getElementById('login-email');
+const loginPasswordInput = document.getElementById('login-password');
+const regEmailInput = document.getElementById('reg-email');
+const regPasswordInput = document.getElementById('reg-password');
+const regUsernameInput = document.getElementById('reg-username');
+const migrateEmailInput = document.getElementById('migrate-email');
+
+const authViewLogin = document.getElementById('auth-view-login');
+const authViewRegStep1 = document.getElementById('auth-view-register-step1');
+const authViewRegStep2 = document.getElementById('auth-view-register-step2');
+const authViewMigration = document.getElementById('auth-view-migration');
 
 // Google Login Client ID (請替換為您自己的 Google Client ID)
 const GOOGLE_CLIENT_ID = "643599361893-ss0eobqotk8p53lkpatma6177d10e8dp.apps.googleusercontent.com";
@@ -86,7 +112,6 @@ const roomListContainer = document.getElementById('room-list');
 const closeLobbyBtn = document.getElementById('close-lobby-btn');
 const createRoomBtn = document.getElementById('create-room-btn');
 const refreshLobbyBtn = document.getElementById('refresh-lobby-btn');
-const multiplayerBtn = document.getElementById('multiplayer-btn');
 
 // Game State
 let currentUser = null;
@@ -122,6 +147,103 @@ const playerUpgrades = {
     hp: { level: 0, maxLevel: Infinity, name: '修復奈米', desc: '自動修復受損裝甲', icon: '🛡️' }
 };
 
+// Control Mode State
+let controlMode = 'pc'; // 'pc' or 'mobile'
+const mobileControlsUI = document.getElementById('mobile-controls');
+const modePcBtn = document.getElementById('mode-pc-btn');
+const modeMobileBtn = document.getElementById('mode-mobile-btn');
+const joystickBase = document.getElementById('joystick-base');
+const joystickStick = document.getElementById('joystick-stick');
+const mobileSkillBtn = document.getElementById('mobile-skill-btn');
+
+let joystickActive = false;
+let joystickStartPos = { x: 0, y: 0 };
+let joystickCurrentPos = { x: 0, y: 0 };
+let joystickVector = { x: 0, y: 0 };
+
+function setControlMode(mode) {
+    controlMode = mode;
+    if (mode === 'mobile') {
+        modeMobileBtn.classList.add('active');
+        modePcBtn.classList.remove('active');
+        if (gameRunning) mobileControlsUI.classList.remove('hidden');
+    } else {
+        modePcBtn.classList.add('active');
+        modeMobileBtn.classList.remove('active');
+        mobileControlsUI.classList.add('hidden');
+    }
+    localStorage.setItem('survivor_control_mode', mode);
+}
+
+// Initial detection or load from storage
+const savedMode = localStorage.getItem('survivor_control_mode');
+if (savedMode) {
+    setControlMode(savedMode);
+} else {
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    setControlMode(isTouchDevice ? 'mobile' : 'pc');
+}
+
+if (modePcBtn) modePcBtn.addEventListener('click', () => setControlMode('pc'));
+if (modeMobileBtn) modeMobileBtn.addEventListener('click', () => setControlMode('mobile'));
+
+// Joystick Logic
+if (joystickBase) {
+    joystickBase.addEventListener('touchstart', (e) => {
+        joystickActive = true;
+        const touch = e.touches[0];
+        const rect = joystickBase.getBoundingClientRect();
+        joystickStartPos = {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        };
+        updateJoystick(touch);
+        e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+        if (!joystickActive) return;
+        updateJoystick(e.touches[0]);
+        e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => {
+        if (!joystickActive) return;
+        joystickActive = false;
+        joystickVector = { x: 0, y: 0 };
+        joystickStick.style.transform = `translate(-50%, -50%)`;
+    });
+}
+
+function updateJoystick(touch) {
+    const dx = touch.clientX - joystickStartPos.x;
+    const dy = touch.clientY - joystickStartPos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const maxRadius = 50;
+    
+    const angle = Math.atan2(dy, dx);
+    const clampedDist = Math.min(dist, maxRadius);
+    
+    const stickX = Math.cos(angle) * clampedDist;
+    const stickY = Math.sin(angle) * clampedDist;
+    
+    joystickStick.style.transform = `translate(calc(-50% + ${stickX}px), calc(-50% + ${stickY}px))`;
+    
+    joystickVector = {
+        x: Math.cos(angle) * (clampedDist / maxRadius),
+        y: Math.sin(angle) * (clampedDist / maxRadius)
+    };
+}
+
+if (mobileSkillBtn) {
+    mobileSkillBtn.addEventListener('touchstart', (e) => {
+        if (gameRunning && !isPaused) {
+            requestAirSupport();
+        }
+        e.preventDefault();
+    }, { passive: false });
+}
+
 // Audio System
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 let musicEnabled = true;
@@ -156,7 +278,7 @@ const gamePlaylist = [
 ];
 let currentTrackIndex = 0;
 
-const menuPlaylist = ['menu_theme/menu_theme.mp3'];
+const menuPlaylist = ['menu_theme/独り音 _ 君と恋【フリーBGM・歌】_320k.ogg'];
 let currentMenuTrackIndex = 0;
 
 let loginDemoCtx = null;
@@ -297,49 +419,8 @@ function playSound(type) {
 }
 
 function playRadioVoice(text) {
-    const now = audioCtx.currentTime;
-    
-    // 1. Radio Static Noise
-    const bufferSize = audioCtx.sampleRate * 2.5; // Slightly longer than speech
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-        data[i] = (Math.random() * 2 - 1) * 0.1; // Low volume noise
-    }
-
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = buffer;
-    
-    // Bandpass filter for radio effect
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 1000;
-    filter.Q.value = 1;
-    
-    const gain = audioCtx.createGain();
-    gain.gain.setValueAtTime(0.15, now);
-    gain.gain.linearRampToValueAtTime(0.15, now + 2);
-    gain.gain.linearRampToValueAtTime(0, now + 2.5);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(audioCtx.destination);
-    noise.start(now);
-
-    // 2. Speech
-    if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'zh-TW';
-        utterance.rate = 0.9; // Slower, more deliberate
-        utterance.pitch = 0.6; // Deep male voice
-        
-        // Try to find a male voice if possible
-        const voices = window.speechSynthesis.getVoices();
-        const maleVoice = voices.find(v => v.name.includes('Male') || v.name.includes('David') || v.name.includes('Danny'));
-        if (maleVoice) utterance.voice = maleVoice;
-        
-        window.speechSynthesis.speak(utterance);
-    }
+    // 遊戲語音已移除，改為系統彈出通知
+    showNotification(text);
 }
 
 function resizeCanvas() {
@@ -439,9 +520,15 @@ window.addEventListener('keyup', (e) => {
     }
 });
 
-startBtn.addEventListener('click', startGame);
-restartBtn.addEventListener('click', startGame);
-menuBtn.addEventListener('click', showMainMenu);
+if (startBtn) {
+    startBtn.addEventListener('click', startGame);
+}
+if (restartBtn) {
+    restartBtn.addEventListener('click', startGame);
+}
+if (menuBtn) {
+    menuBtn.addEventListener('click', showMainMenu);
+}
 
 // Login Logic
 
@@ -510,7 +597,6 @@ let tutorialGuide = {
             void commanderGuide.offsetWidth;
             commanderGuide.classList.add('talking');
         }
-        try { playRadioVoice(text); } catch {}
     },
     start() {
         this.active = true;
@@ -575,25 +661,81 @@ function updateBindingUI() {
     }
 }
 
+let tempRegData = { email: '', password: '' };
+let tempMigrationData = { username: '', password: '', userObj: null };
+
+function showAuthView(viewName) {
+    if (authViewLogin) authViewLogin.classList.add('hidden');
+    if (authViewRegStep1) authViewRegStep1.classList.add('hidden');
+    if (authViewRegStep2) authViewRegStep2.classList.add('hidden');
+    if (authViewMigration) authViewMigration.classList.add('hidden');
+
+    if (viewName === 'login' && authViewLogin) authViewLogin.classList.remove('hidden');
+    else if (viewName === 'register-step1' && authViewRegStep1) authViewRegStep1.classList.remove('hidden');
+    else if (viewName === 'register-step2' && authViewRegStep2) authViewRegStep2.classList.remove('hidden');
+    else if (viewName === 'migration' && authViewMigration) authViewMigration.classList.remove('hidden');
+}
+
+function isUsernameTaken(username) {
+    if (['Dev','開發人員','Developer','Admin','開發團隊'].includes(username)) return true;
+    
+    const accountsRaw = localStorage.getItem('survivor_accounts');
+    const oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
+    if (oldAccounts[username]) return true;
+    
+    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
+    for (const email in v2Accounts) {
+        if (v2Accounts[email] && v2Accounts[email].user && v2Accounts[email].user.username === username) {
+            return true;
+        }
+    }
+    
+    const bindingsRaw = localStorage.getItem('survivor_google_bindings');
+    const bindings = bindingsRaw ? JSON.parse(bindingsRaw) : {};
+    for (const key in bindings) {
+        if (bindings[key] && bindings[key].username === username) return true;
+    }
+    
+    return false;
+}
+
+function isEmailTaken(email) {
+    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
+    return !!v2Accounts[email];
+}
+
 function handleAccountRename() {
     const newName = (newUsernameInput ? newUsernameInput.value.trim() : '').slice(0, 20);
     if (!currentUser || !newName) { alert('請輸入新的名稱'); return; }
     const oldName = currentUser.username;
     if (newName === oldName) { alert('名稱未變更'); return; }
-    if (['Dev','開發人員','Developer','Admin','開發團隊'].includes(newName)) { alert('此名稱不可使用'); return; }
-    const raw = localStorage.getItem('survivor_accounts');
-    let accounts = raw ? JSON.parse(raw) : {};
-    if (accounts[newName] && (!accounts[oldName] || accounts[newName].user.uid !== currentUser.uid)) {
-        alert('名稱已被使用'); return;
+    
+    if (isUsernameTaken(newName)) {
+        alert('此名稱已被使用');
+        return;
     }
-    if (accounts[oldName]) {
-        const pw = accounts[oldName].password;
-        accounts[newName] = { password: pw, user: { ...currentUser, username: newName } };
-        delete accounts[oldName];
+
+    if (currentUser.email) {
+        const v2Raw = localStorage.getItem('survivor_accounts_v2');
+        let v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
+        if (v2Accounts[currentUser.email]) {
+            v2Accounts[currentUser.email].user.username = newName;
+            localStorage.setItem('survivor_accounts_v2', JSON.stringify(v2Accounts));
+        }
     } else {
-        accounts[newName] = { password: '', user: { ...currentUser, username: newName } };
+        // Fallback for old accounts if they bypassed migration
+        const raw = localStorage.getItem('survivor_accounts');
+        let accounts = raw ? JSON.parse(raw) : {};
+        if (accounts[oldName]) {
+            const pw = accounts[oldName].password;
+            accounts[newName] = { password: pw, user: { ...currentUser, username: newName } };
+            delete accounts[oldName];
+            localStorage.setItem('survivor_accounts', JSON.stringify(accounts));
+        }
     }
-    localStorage.setItem('survivor_accounts', JSON.stringify(accounts));
+
     migrateUserProgress(oldName, newName);
     currentUser.username = newName;
     saveUserSession();
@@ -603,83 +745,156 @@ function handleAccountRename() {
     updateBindingUI();
     alert(isCurrentUserBound() ? '名稱已更新（已綁定）' : '名稱已更新');
 }
-function handleLogin(mode = 'login') {
-    // 直接從 DOM 獲取最新數值，確保抓得到內容
-    const usernameEl = document.getElementById('username');
-    const passwordEl = document.getElementById('password');
-    const username = usernameEl ? usernameEl.value.trim() : '';
-    const password = passwordEl ? passwordEl.value.trim() : '';
 
-    if (!username || !password) {
-        alert('請輸入帳號與密碼');
+function handleBtnRegNext() {
+    const email = regEmailInput ? regEmailInput.value.trim() : '';
+    const password = regPasswordInput ? regPasswordInput.value.trim() : '';
+    
+    if (!email) { alert('請輸入電子郵件'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('請輸入有效的電子郵件格式'); return; }
+    if (password.length < 6) { alert('密碼請設定至少 6 個字元'); return; }
+    
+    if (isEmailTaken(email)) {
+        alert('此信箱已經註冊過帳號，請直接登入或使用其他信箱。');
         return;
     }
+    
+    tempRegData.email = email;
+    tempRegData.password = password;
+    showAuthView('register-step2');
+}
 
-    // Load account database
-    const accountsRaw = localStorage.getItem('survivor_accounts');
-    let accounts = accountsRaw ? JSON.parse(accountsRaw) : {};
-
-    // Special Case: Dev Account (支援 Dev 與 開發人員) 僅適用於登入
-    if (mode === 'login' && (username === 'Dev' || username === '開發人員' || username === 'Developer' || username === 'Admin')) {
-        currentUser = { username: '開發團隊', uid: 'DEV_001', isAdmin: true };
-    } else if (mode === 'login') {
-        if (!accounts[username]) {
-            alert('找不到此帳號，請確認輸入或改用註冊。');
-            return;
-        }
-        if (accounts[username].password !== password) {
-            alert('密碼錯誤，請再試一次。');
-            return;
-        }
-        currentUser = accounts[username].user;
-    } else if (mode === 'register') {
-        if (['Dev','開發人員','Developer','Admin','開發團隊'].includes(username)) {
-            alert('此名稱為保留代號，無法註冊使用。');
-            return;
-        }
-        if (accounts[username]) {
-            alert('此帳號名稱已被使用，請改用其他名稱或直接登入。');
-            return;
-        }
-        let hash = 0;
-        for (let i = 0; i < username.length; i++) {
-            hash = ((hash << 5) - hash) + username.charCodeAt(i);
-            hash |= 0;
-        }
-        const uidSuffix = Math.abs(hash % 10000).toString().padStart(4, '0');
-        const uid = 'CMD_' + uidSuffix;
-        
-        currentUser = { username, uid, isAdmin: false };
-        accounts[username] = { password, user: currentUser };
-        
-        localStorage.setItem('survivor_accounts', JSON.stringify(accounts));
-        
-        const prefix = `_${username}`;
-        localStorage.removeItem(`survivor_funds${prefix}`);
-        localStorage.removeItem(`survivor_units_owned${prefix}`);
-        localStorage.removeItem(`survivor_units_equipped${prefix}`);
-    } else {
-        alert('未知的登入模式');
+function handleBtnRegSubmit() {
+    const username = regUsernameInput ? regUsernameInput.value.trim() : '';
+    if (!username) { alert('請輸入指揮官代號'); return; }
+    
+    if (isUsernameTaken(username)) {
+        alert('此指揮官代號已被使用，請更換其他名稱。');
         return;
     }
+    
+    let hash = 0;
+    for (let i = 0; i < username.length; i++) {
+        hash = ((hash << 5) - hash) + username.charCodeAt(i);
+        hash |= 0;
+    }
+    const uidSuffix = Math.abs(hash % 10000).toString().padStart(4, '0');
+    const uid = 'CMD_' + uidSuffix;
+    
+    currentUser = { username, uid, isAdmin: false, email: tempRegData.email };
+    
+    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    let v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
+    
+    v2Accounts[tempRegData.email] = { password: tempRegData.password, user: currentUser };
+    localStorage.setItem('survivor_accounts_v2', JSON.stringify(v2Accounts));
+    
+    tempRegData = { email: '', password: '' };
     
     saveUserSession();
-    
-    // Load meta progress (will be fresh if new account)
     loadMetaProgress(); 
     updateUserUI();
     loginModal.classList.add('hidden');
     
-    usernameInput.value = '';
-    passwordInput.value = '';
+    if (regEmailInput) regEmailInput.value = '';
+    if (regPasswordInput) regPasswordInput.value = '';
+    if (regUsernameInput) regUsernameInput.value = '';
     
-    if (mode === 'register') {
-        alert(`註冊成功，${currentUser.username} 指揮官已建立帳號並登入！`);
-    } else {
-        alert(`登入成功，${currentUser.username} 指揮官已登入！`);
-    }
+    alert(`註冊成功，${currentUser.username} 指揮官已建立帳號並登入！`);
     renderLeaderboard(); 
     showTutorialIfNeeded();
+}
+
+function handleBtnSubmitLogin() {
+    const emailOrOldId = loginEmailInput ? loginEmailInput.value.trim() : '';
+    const password = loginPasswordInput ? loginPasswordInput.value.trim() : '';
+    
+    if (!emailOrOldId || !password) {
+        alert('請輸入登入資訊與密碼');
+        return;
+    }
+    
+    if (emailOrOldId === 'Dev' || emailOrOldId === '開發人員' || emailOrOldId === 'Developer' || emailOrOldId === 'Admin') {
+        currentUser = { username: '開發團隊', uid: 'DEV_001', isAdmin: true };
+        completeLoginFlow();
+        return;
+    }
+    
+    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
+    
+    if (v2Accounts[emailOrOldId] && v2Accounts[emailOrOldId].password === password) {
+        currentUser = v2Accounts[emailOrOldId].user;
+        if (!currentUser.email) currentUser.email = emailOrOldId;
+        completeLoginFlow();
+        return;
+    }
+    
+    const accountsRaw = localStorage.getItem('survivor_accounts');
+    const oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
+    
+    if (oldAccounts[emailOrOldId]) {
+        if (oldAccounts[emailOrOldId].password !== password) {
+            alert('密碼錯誤，請再試一次。');
+            return;
+        }
+        tempMigrationData = { 
+            username: emailOrOldId, 
+            password: password, 
+            userObj: oldAccounts[emailOrOldId].user 
+        };
+        showAuthView('migration');
+        return;
+    }
+    
+    alert('找不到此帳號或信箱，請確認輸入是否有誤。');
+}
+
+function completeLoginFlow() {
+    saveUserSession();
+    loadMetaProgress(); 
+    updateUserUI();
+    loginModal.classList.add('hidden');
+    
+    if (loginEmailInput) loginEmailInput.value = '';
+    if (loginPasswordInput) loginPasswordInput.value = '';
+    
+    alert(`登入成功，${currentUser.username} 指揮官已登入！`);
+    renderLeaderboard(); 
+    showTutorialIfNeeded();
+}
+
+function handleBtnSubmitMigration() {
+    const bindEmail = migrateEmailInput ? migrateEmailInput.value.trim() : '';
+    if (!bindEmail) { alert('請輸入您的電子郵件'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bindEmail)) { alert('請輸入有效的電子郵件格式'); return; }
+    
+    if (isEmailTaken(bindEmail)) {
+        alert('此信箱已經綁定過帳號，無法重複綁定。');
+        return;
+    }
+    
+    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    let v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
+    
+    tempMigrationData.userObj.email = bindEmail;
+    v2Accounts[bindEmail] = {
+        password: tempMigrationData.password,
+        user: tempMigrationData.userObj
+    };
+    
+    localStorage.setItem('survivor_accounts_v2', JSON.stringify(v2Accounts));
+    
+    const accountsRaw = localStorage.getItem('survivor_accounts');
+    let oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
+    delete oldAccounts[tempMigrationData.username];
+    localStorage.setItem('survivor_accounts', JSON.stringify(oldAccounts));
+    
+    currentUser = tempMigrationData.userObj;
+    tempMigrationData = { username: '', password: '', userObj: null };
+    
+    if (migrateEmailInput) migrateEmailInput.value = '';
+    completeLoginFlow();
 }
 
 function continueAsGuest() {
@@ -730,17 +945,37 @@ function handleGoogleLogin(response) {
         }
         
         if (bindings[seed] && bindings[seed].username) {
-            const accountsRaw = localStorage.getItem('survivor_accounts');
-            let accounts = accountsRaw ? JSON.parse(accountsRaw) : {};
             const boundName = bindings[seed].username;
             const boundUid = bindings[seed].uid || uid;
-            if (accounts[boundName]) {
-                currentUser = accounts[boundName].user;
-            } else {
-                currentUser = { username: boundName, uid: boundUid, isAdmin: false };
-                accounts[boundName] = { password: '', user: currentUser };
-                localStorage.setItem('survivor_accounts', JSON.stringify(accounts));
+            let found = false;
+            
+            const v2Raw = localStorage.getItem('survivor_accounts_v2');
+            const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
+            for (const email in v2Accounts) {
+                if (v2Accounts[email].user && v2Accounts[email].user.username === boundName) {
+                    currentUser = v2Accounts[email].user;
+                    found = true;
+                    break;
+                }
             }
+            
+            if (!found) {
+                const accountsRaw = localStorage.getItem('survivor_accounts');
+                const oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
+                if (oldAccounts[boundName]) {
+                    currentUser = oldAccounts[boundName].user;
+                    found = true;
+                }
+            }
+            
+            if (!found) {
+                currentUser = { username: boundName, uid: boundUid, isAdmin: false };
+            }
+            
+            currentUser.isGoogleUser = true;
+            currentUser.email = googleUser.email;
+            currentUser.picture = googleUser.picture;
+            
         } else {
             currentUser = { 
                 username: googleUser.name, 
@@ -1089,138 +1324,12 @@ function loadMetaProgress() {
 }
 
 function initLoginDemo() {
-    const canvasEl = document.getElementById('login-demo-canvas');
-    if (!canvasEl) return;
-    const container = canvasEl.parentElement;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const scale = window.devicePixelRatio || 1;
-    canvasEl.width = rect.width * scale;
-    canvasEl.height = rect.height * scale;
-    const c = canvasEl.getContext('2d');
-    if (!c) return;
-    loginDemoCtx = c;
-    loginDemoCtx.setTransform(scale, 0, 0, scale, 0, 0);
-    loginDemoEntities = [];
-    for (let i = 0; i < 6; i++) {
-        loginDemoEntities.push({
-            type: 'enemy',
-            x: rect.width * (0.2 + Math.random() * 0.6),
-            y: rect.height * (0.2 + Math.random() * 0.6),
-            vx: (Math.random() - 0.5) * 40,
-            vy: (Math.random() - 0.5) * 40,
-            r: 10 + Math.random() * 8
-        });
-    }
-    loginDemoEntities.push({
-        type: 'player',
-        x: rect.width * 0.25,
-        y: rect.height * 0.6,
-        r: 12,
-        angle: -Math.PI / 2
-    });
+    // Disabled at user request
     if (loginDemoAnimationId) cancelAnimationFrame(loginDemoAnimationId);
-    loginDemoLastTime = 0;
-    loginDemoAnimationId = requestAnimationFrame(loginDemoLoop);
 }
 
 function loginDemoLoop(timestamp) {
-    if (!loginDemoCtx) return;
-    const rect = loginDemoCtx.canvas.getBoundingClientRect();
-    if (!loginDemoLastTime) loginDemoLastTime = timestamp;
-    const dt = Math.min(0.05, (timestamp - loginDemoLastTime) / 1000);
-    loginDemoLastTime = timestamp;
-    const w = rect.width;
-    const h = rect.height;
-    const ctx2 = loginDemoCtx;
-    ctx2.clearRect(0, 0, w, h);
-    const g = ctx2.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.9);
-    g.addColorStop(0, 'rgba(0,255,255,0.25)');
-    g.addColorStop(1, 'rgba(0,0,0,1)');
-    ctx2.fillStyle = g;
-    ctx2.fillRect(0, 0, w, h);
-    const player = loginDemoEntities.find(e => e.type === 'player');
-    const enemies = loginDemoEntities.filter(e => e.type === 'enemy');
-    enemies.forEach(e => {
-        e.x += e.vx * dt;
-        e.y += e.vy * dt;
-        if (e.x < 0 || e.x > w) e.vx *= -1;
-        if (e.y < 0 || e.y > h) e.vy *= -1;
-    });
-    let currentTarget = null;
-    if (player && enemies.length) {
-        currentTarget = enemies[Math.floor(timestamp / 900) % enemies.length];
-        const dx = currentTarget.x - player.x;
-        const dy = currentTarget.y - player.y;
-        player.angle = Math.atan2(dy, dx);
-        const t = (timestamp % 900) / 900;
-        const bx = player.x + Math.cos(player.angle) * 40 * t;
-        const by = player.y + Math.sin(player.angle) * 40 * t;
-        ctx2.strokeStyle = 'rgba(0,255,255,0.7)';
-        ctx2.lineWidth = 2;
-        ctx2.beginPath();
-        ctx2.moveTo(player.x, player.y);
-        ctx2.lineTo(bx, by);
-        ctx2.stroke();
-        if (t > 0.9) {
-            ctx2.fillStyle = 'rgba(255,255,255,0.9)';
-            ctx2.beginPath();
-            ctx2.arc(currentTarget.x, currentTarget.y, currentTarget.r * 1.5, 0, Math.PI * 2);
-            ctx2.fill();
-        }
-    }
-    enemies.forEach(e => {
-        ctx2.save();
-        ctx2.translate(e.x, e.y);
-        ctx2.scale(1.15, 0.9);
-        ctx2.beginPath();
-        ctx2.arc(0, 0, e.r, Math.PI, 0, false);
-        ctx2.arc(0, 0, e.r * 0.85, 0, Math.PI, true);
-        ctx2.closePath();
-        ctx2.fillStyle = 'rgba(80,255,140,0.85)';
-        ctx2.shadowBlur = 18;
-        ctx2.shadowColor = '#00ff88';
-        ctx2.fill();
-        ctx2.shadowBlur = 0;
-        ctx2.fillStyle = 'rgba(0,80,40,0.9)';
-        ctx2.beginPath();
-        ctx2.arc(-e.r * 0.35, -e.r * 0.15, e.r * 0.18, 0, Math.PI * 2);
-        ctx2.arc(e.r * 0.1, -e.r * 0.15, e.r * 0.18, 0, Math.PI * 2);
-        ctx2.fill();
-        ctx2.restore();
-    });
-    if (player) {
-        ctx2.save();
-        ctx2.translate(player.x, player.y);
-        ctx2.rotate(player.angle || 0);
-        ctx2.beginPath();
-        ctx2.moveTo(20, 0);
-        ctx2.lineTo(-10, 10);
-        ctx2.lineTo(-10, -10);
-        ctx2.closePath();
-        ctx2.fillStyle = 'rgba(66,165,255,0.95)';
-        ctx2.shadowBlur = 18;
-        ctx2.shadowColor = '#42a5ff';
-        ctx2.fill();
-        ctx2.shadowBlur = 0;
-        ctx2.fillStyle = 'rgba(46,120,255,0.9)';
-        ctx2.beginPath();
-        ctx2.moveTo(-4, 10);
-        ctx2.lineTo(-14, 18);
-        ctx2.lineTo(-8, 3);
-        ctx2.closePath();
-        ctx2.moveTo(-4, -10);
-        ctx2.lineTo(-14, -18);
-        ctx2.lineTo(-8, -3);
-        ctx2.closePath();
-        ctx2.fill();
-        ctx2.beginPath();
-        ctx2.arc(-4, 0, 6, 0, Math.PI * 2);
-        ctx2.fillStyle = 'rgba(15,35,80,0.95)';
-        ctx2.fill();
-        ctx2.restore();
-    }
-    loginDemoAnimationId = requestAnimationFrame(loginDemoLoop);
+    // Disabled at user request
 }
 
 function startMenuBackground() {
@@ -1456,11 +1565,6 @@ function checkSavedUser() {
         loadMetaProgress();
     }
     updateUserUI(); 
-    if (loginModal) {
-        loginModal.classList.remove('hidden');
-        try { initGoogleLogin(); } catch {}
-        try { initLoginDemo(); } catch {}
-    }
 }
 
 // 移除原本底部的分散呼叫，統一由 checkSavedUser 處理初始化
@@ -1523,18 +1627,19 @@ setInterval(() => {
     if (adminClearDataBtn) adminClearDataBtn.onclick = handleAdminClearData;
     
     // 統一在這裡綁定登入 / 註冊 / 訪客按鈕
-    if (authSubmitBtn) {
-        authSubmitBtn.onclick = (e) => {
-            e.preventDefault();
-            handleLogin('login');
-        };
-    }
-    if (registerSubmitBtn) {
-        registerSubmitBtn.onclick = (e) => {
-            e.preventDefault();
-            handleLogin('register');
-        };
-    }
+    if (btnGotoRegister) btnGotoRegister.onclick = () => showAuthView('register-step1');
+    if (btnBacktoLogin) btnBacktoLogin.onclick = () => showAuthView('login');
+    if (btnRegBack) btnRegBack.onclick = () => showAuthView('register-step1');
+    if (btnCancelMigration) btnCancelMigration.onclick = () => {
+        tempMigrationData = { username: '', password: '', userObj: null };
+        showAuthView('login');
+    };
+    
+    if (btnSubmitLogin) btnSubmitLogin.onclick = handleBtnSubmitLogin;
+    if (btnRegNext) btnRegNext.onclick = handleBtnRegNext;
+    if (btnRegSubmit) btnRegSubmit.onclick = handleBtnRegSubmit;
+    if (btnSubmitMigration) btnSubmitMigration.onclick = handleBtnSubmitMigration;
+    
     if (guestContinueBtn) {
         guestContinueBtn.onclick = (e) => {
             e.preventDefault();
@@ -1544,7 +1649,7 @@ setInterval(() => {
     
     if (loginTriggerBtn) loginTriggerBtn.onclick = () => {
         loginModal.classList.remove('hidden');
-        // 每次開啟登入視窗都嘗試渲染一次按鈕，確保容器存在
+        showAuthView('login'); // 每次開啟都回到登入視窗
         initGoogleLogin();
         initLoginDemo();
     };
@@ -1800,9 +1905,9 @@ class MultiplayerManager {
                 if (dist > 100) { // 差距過大才進行瞬移校正
                     this.localX = p.x;
                     this.localY = p.y;
-                } else if (dist > 1) { // 小差距使用插值平滑，消除抖動
-                    this.localX += (p.x - this.localX) * 0.15;
-                    this.localY += (p.y - this.localY) * 0.15;
+                } else if (dist > 50) { // 放寬本地端預測差異的容忍度，避免因伺服器延遲導致的拉扯感
+                    this.localX += (p.x - this.localX) * 0.1;
+                    this.localY += (p.y - this.localY) * 0.1;
                 }
             }
         });
@@ -1823,13 +1928,22 @@ class MultiplayerManager {
         
         // 1. 本地移動預測 (Client-side Prediction)
         const baseSpeed = config.playerSpeed;
-        const dx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
-        const dy = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
+        let dx, dy;
+        
+        if (controlMode === 'mobile') {
+            dx = joystickVector.x;
+            dy = joystickVector.y;
+        } else {
+            dx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
+            dy = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
+        }
         
         if (dx !== 0 || dy !== 0) {
             const length = Math.hypot(dx, dy);
-            this.localX += (dx / length) * baseSpeed;
-            this.localY += (dy / length) * baseSpeed;
+            const moveX = controlMode === 'mobile' ? dx : (dx / length);
+            const moveY = controlMode === 'mobile' ? dy : (dy / length);
+            this.localX += moveX * baseSpeed;
+            this.localY += moveY * baseSpeed;
         }
 
         const now = Date.now();
@@ -1866,7 +1980,7 @@ class MultiplayerManager {
             this.lastSoundTime = now;
         }
 
-        if (now - this.lastInputSent < 16) return; // 60Hz
+        if (now - this.lastInputSent < 33) return; // 降至 30Hz 傳送輸入，減少網路擁塞
         
         this.socket.send(JSON.stringify({
             type: 'input',
@@ -2139,10 +2253,15 @@ class Player {
 
     update(dt) {
         // Movement
-        if (keys.w) this.y -= config.playerSpeed;
-        if (keys.s) this.y += config.playerSpeed;
-        if (keys.a) this.x -= config.playerSpeed;
-        if (keys.d) this.x += config.playerSpeed;
+        if (controlMode === 'mobile') {
+            this.x += joystickVector.x * config.playerSpeed;
+            this.y += joystickVector.y * config.playerSpeed;
+        } else {
+            if (keys.w) this.y -= config.playerSpeed;
+            if (keys.s) this.y += config.playerSpeed;
+            if (keys.a) this.x -= config.playerSpeed;
+            if (keys.d) this.x += config.playerSpeed;
+        }
 
         // Auto Fire
         const now = Date.now();
@@ -3331,7 +3450,7 @@ function animate() {
     updateCamera();
     updateAirSupportUI();
     updateTargeting();
-    checkBossHint();
+    AIAdvisor.checkAndAdvise();
 
     // Clear with trail effect? No, clean clear for now
     ctx.fillStyle = 'rgba(26, 26, 26, 1)';
@@ -3546,13 +3665,64 @@ function showNotification(message) {
     }, 5000);
 }
 
-function checkBossHint() {
-    if (!bossHintShown && player.level >= 5) {
-        bossHintShown = true;
-        showNotification("戰術建議：Boss 戰臨近，建議集中火力並保持拉扯距離");
-        createFloatingText(player.x, player.y - 80, "BOSS INCOMING", "#ff4444");
+const AIAdvisor = {
+    lastAdviceTime: 0,
+    cooldown: 15000,
+    
+    checkAndAdvise: function() {
+        const now = Date.now();
+        if (now - this.lastAdviceTime < this.cooldown) return;
+
+        let messages = [];
+
+        if (player.hp < player.maxHp * 0.3) {
+            messages.push("戰術分析：裝甲受損嚴重！建議暫避鋒芒，尋找周圍的維修包補給！");
+            messages.push("警告：生命值低下！立刻使用機動躲避，等待空襲冷卻！");
+        }
+
+        let enemiesNear = 0;
+        for (const e of enemies) {
+            const dx = e.x - player.x;
+            const dy = e.y - player.y;
+            if (dx*dx + dy*dy < 500 * 500) enemiesNear++;
+        }
+        
+        if (enemiesNear > 25) {
+            messages.push("戰場掃描：偵測到大量敵軍包圍！優先將砲火集中於突圍缺口！");
+            messages.push("戰術建議：敵方密度過高，請盡速施展戰術走位拉開距離！");
+            if (airSupportTimer <= 0) {
+                 messages.push("系統提示：空襲支援已就緒，正是投彈清場的最佳時機！");
+            }
+        }
+
+        if (militaryFunds > 1500 && Object.keys(equippedUnits).length < 5) {
+            messages.push("後勤提示：指揮官，您的軍費已十分充足，請隨時準備呼叫支援兵裝！");
+        }
+
+        if (player.level >= 5 && player.level < 10 && !bossHintShown) {
+             bossHintShown = true;
+             messages.push("戰鬥預警：前線雷達發現未知強大能量源正在接近，請保持警戒！");
+             createFloatingText(player.x, player.y - 80, "BOSS INCOMING", "#ff4444");
+        }
+        
+        if (messages.length === 0 && Math.random() > 0.8) {
+            const generalTips = [
+                "戰場資訊：保持移動能有效降低受擊機率，尋找安全的輸出位置！",
+                "裝備提示：適時搭配不同的武器部件，才能在蟲海中殺出重圍！",
+                "系統建議：如果覺得吃力，可以回到大廳透過裝備庫強化基礎屬性。",
+                "核心提示：留意戰場上隨機掉落的補給晶體，累積能量以獲得等級優勢！",
+                "戰術建議：優先強化火力與機動，保持輸出與距離！"
+            ];
+            messages.push(generalTips[Math.floor(Math.random() * generalTips.length)]);
+        }
+
+        if (messages.length > 0) {
+            const advice = messages[Math.floor(Math.random() * messages.length)];
+            showNotification(advice);
+            this.lastAdviceTime = now;
+        }
     }
-}
+};
 
 function startGame() {
     stopMenuBackground();
@@ -3560,6 +3730,7 @@ function startGame() {
     gameRunning = true;
     startScreen.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
+    if (controlMode === 'mobile') mobileControlsUI.classList.remove('hidden');
     startBackgroundMusic();
     animate();
     
@@ -3612,6 +3783,7 @@ function endGame() {
     gameRunning = false;
     cancelAnimationFrame(animationId);
     clearInterval(window.enemyInterval);
+    mobileControlsUI.classList.add('hidden');
     finalScoreDisplay.textContent = score;
     recordScoreToLeaderboard(score);
     const gainedFunds = Math.floor(score * fundsGainMultiplier);
@@ -3648,6 +3820,7 @@ function showMainMenu() {
     
     cancelAnimationFrame(animationId);
     clearInterval(window.enemyInterval);
+    mobileControlsUI.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
     startScreen.classList.remove('hidden');
     

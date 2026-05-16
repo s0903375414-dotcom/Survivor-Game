@@ -7,7 +7,7 @@ const SharedConfig = require('./shared_config.js');
 const server = http.createServer((req, res) => {
     let filePath = req.url === '/' ? '/index.html' : req.url;
     // 移除查詢字串
-    filePath = filePath.split('?')[0];
+    filePath = decodeURIComponent(filePath.split('?')[0]);
     const fullPath = path.join(__dirname, filePath);
 
     fs.readFile(fullPath, (err, data) => {
@@ -39,11 +39,15 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ server });
 
 const rooms = new Map();
-const MAX_PLAYERS_PER_ROOM = 4;
+const MAX_PLAYERS_PER_ROOM = 8; // 單一房間安全上限
+const MAX_SERVER_PLAYERS = 20;  // 全伺服器同時在線上限（大廳可容納人數）
 
-function createRoom(roomId) {
+function createRoom(roomId, maxPlayers = 4, baseDifficulty = 1) {
+    const clampedMax = Math.max(1, Math.min(MAX_PLAYERS_PER_ROOM, parseInt(maxPlayers, 10) || 4));
+    const diff = baseDifficulty > 0 ? Number(baseDifficulty) || 1 : 1;
     return {
         id: roomId,
+        maxPlayers: clampedMax,
         players: new Map(),
         enemies: [],
         bullets: [],
@@ -53,7 +57,8 @@ function createRoom(roomId) {
         tick: 0,
         lastEnemySpawn: 0,
         lastHealthPackSpawn: 0,
-        difficulty: 1,
+        baseDifficulty: diff,
+        difficulty: diff,
         createdAt: Date.now()
     };
 }
@@ -240,18 +245,20 @@ function gameLoop() {
             }
         }
 
-        const state = {
-            type: 'state',
-            tick: room.tick,
-            players: Array.from(room.players.values()).map(p => ({
-                id: p.id, name: p.name, x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp, level: p.level, xp: p.xp, xpToNextLevel: p.xpToNextLevel
-            })),
-            enemies: room.enemies.map(e => ({ x: e.x, y: e.y, type: e.type, hp: e.hp, maxHp: e.maxHp, radius: e.radius, isBoss: e.isBoss })),
-            bullets: room.bullets.map(b => ({ x: b.x, y: b.y })),
-            xpOrbs: room.xpOrbs.map(o => ({ x: o.x, y: o.y })),
-            healthPacks: room.healthPacks.map(h => ({ x: h.x, y: h.y }))
-        };
-        broadcast(room, state);
+        if (room.tick % 2 === 0) {
+            const state = {
+                type: 'state',
+                tick: room.tick,
+                players: Array.from(room.players.values()).map(p => ({
+                    id: p.id, name: p.name, x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp, level: p.level, xp: p.xp, xpToNextLevel: p.xpToNextLevel
+                })),
+                enemies: room.enemies.map(e => ({ x: e.x, y: e.y, type: e.type, hp: e.hp, maxHp: e.maxHp, radius: e.radius, isBoss: e.isBoss })),
+                bullets: room.bullets.map(b => ({ x: b.x, y: b.y })),
+                xpOrbs: room.xpOrbs.map(o => ({ x: o.x, y: o.y })),
+                healthPacks: room.healthPacks.map(h => ({ x: h.x, y: h.y }))
+            };
+            broadcast(room, state);
+        }
     });
 }
 
@@ -270,18 +277,31 @@ wss.on('connection', (ws) => {
             const roomList = Array.from(rooms.values()).map(r => ({
                 id: r.id,
                 playerCount: r.players.size,
-                maxPlayers: MAX_PLAYERS_PER_ROOM
+                maxPlayers: r.maxPlayers || MAX_PLAYERS_PER_ROOM,
+                difficulty: r.baseDifficulty || r.difficulty || 1
             }));
             ws.send(JSON.stringify({ type: 'room_list', rooms: roomList }));
         } 
         else if (msg.type === 'join') {
             const roomId = msg.roomId || '中心指揮部';
             const name = msg.name || '訪客';
+
+            // 全伺服器人數上限檢查（僅在首次加入房間時檢查）
+            if (!playerId) {
+                let totalPlayers = 0;
+                rooms.forEach(r => totalPlayers += r.players.size);
+                if (totalPlayers >= MAX_SERVER_PLAYERS) {
+                    ws.send(JSON.stringify({ type: 'error', message: `大廳目前已滿員（最多 ${MAX_SERVER_PLAYERS} 名指揮官）。` }));
+                    return;
+                }
+            }
             
             // Check if room exists
             if (!rooms.has(roomId)) {
                 if (msg.create) {
-                    rooms.set(roomId, createRoom(roomId));
+                    const requestedMax = msg.maxPlayers;
+                    const requestedDiff = msg.difficulty;
+                    rooms.set(roomId, createRoom(roomId, requestedMax, requestedDiff));
                 } else {
                     ws.send(JSON.stringify({ type: 'error', message: '找不到該房間' }));
                     return;
@@ -291,7 +311,8 @@ wss.on('connection', (ws) => {
             const room = rooms.get(roomId);
 
             // 1. Check if room is full
-            if (room.players.size >= MAX_PLAYERS_PER_ROOM) {
+            const limit = room.maxPlayers || MAX_PLAYERS_PER_ROOM;
+            if (room.players.size >= limit) {
                 ws.send(JSON.stringify({ type: 'error', message: '房間已滿' }));
                 return;
             }

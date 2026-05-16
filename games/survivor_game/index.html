@@ -2,9 +2,15 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Survivor Game</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <!-- iOS PWA meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Survivor">
+    <link rel="apple-touch-icon" href="assets/commander_tutorial.jpg">
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -13,7 +19,7 @@
         <!-- Notifications -->
         <div id="game-notification" class="notification hidden">
             <div class="notification-content">
-                <span class="icon">📢</span>
+                <span class="icon">🤖</span>
                 <span id="notification-text">系統訊息</span>
             </div>
         </div>
@@ -149,6 +155,15 @@
                 </div>
                 <div class="panel-body changelog-body" style="font-size: 11px; max-height: 250px; overflow-y: auto;">
                     <div class="changelog-item">
+                        <div class="version">v4.7.0 (Auth Override)</div>
+                        <ul>
+                            <li>帳號系統：從代號綁定升級為電子信箱機制，實作「舊帳號無縫轉移」流程。</li>
+                            <li>註冊升級：導入雙步驟註冊（信箱與密碼設定 ➔ 指揮官代號），全局防堵信箱與代號重複。</li>
+                            <li>登入介面：整合多視窗切換架構，簡化登入體驗，並移除消耗資源的背景過場動畫。</li>
+                            <li>開發優化：優化底層登入邏輯，使其完美兼容訪客模式與 Google 第三方綁定。</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-item">
                         <div class="version">v4.6.0 (Stable)</div>
                         <ul>
                             <li>音樂系統：支援分資料夾路徑（menu_theme／In-game music），並處理檔名編碼</li>
@@ -156,6 +171,15 @@
                             <li>帳號管理：新增更名功能與綁定狀態顯示，Google 綁定自動回復進度</li>
                             <li>安全設定：更新 Google Client ID 與 Origins 建議配置</li>
                             <li>新手教學：新註冊或首次登入顯示教學面板，完成後不再顯示</li>
+                        </ul>
+                    </div>
+                    <div class="changelog-item">
+                        <div class="version">v4.6.0 (UI Overhaul)</div>
+                        <ul>
+                            <li>登入介面重製：加入導引官立繪、全螢幕戰術背景與登入/註冊/訪客三合一面板</li>
+                            <li>主選單強化：調整按鈕樣式與動畫，將「進入戰區」與「多人連線」獨立成主介面行動選項</li>
+                            <li>視覺強化：新增史萊姆與小機體的戰鬥展示動畫，填滿登入與主選單背景</li>
+                            <li>體驗優化：新增重新新手教學、登入流程優化與 Google 登入整合</li>
                         </ul>
                     </div>
                     <div class="changelog-item">
@@ -308,11 +332,18 @@
                 </div>
 
                 <div class="menu-actions">
+                    <div class="control-mode-selector">
+                        <label class="control-label">操作模式：</label>
+                        <div class="toggle-group">
+                            <button id="mode-pc-btn" class="toggle-btn active">💻 電腦</button>
+                            <button id="mode-mobile-btn" class="toggle-btn">📱 移動端</button>
+                        </div>
+                    </div>
                     <button id="start-btn" class="action-btn endless-btn">
-                        <span class="icon">🎯</span> 單人戰區
+                        <span class="icon">▶</span> 進入戰區 (ENDLESS)
                     </button>
                     <button id="multiplayer-btn" class="action-btn multiplayer-btn">
-                        <span class="icon">🌐</span> 多人作戰
+                        <span class="icon">🌐</span> 多人連線 (ALPHA)
                     </button>
                     <div class="bottom-row">
                         <button id="unit-config-btn" class="action-btn unit-btn">單位配置</button>
@@ -346,11 +377,11 @@
                                 <div class="login-hero-caption">
                                     <div class="login-hero-title">SURVIVOR EVOLUTION</div>
                                     <div class="login-hero-tagline">指揮官集結 · 守住最後防線</div>
-                                    <div class="login-hero-version">版本 v4.6.0</div>
+                                    <div class="login-hero-version">版本 v4.7.0</div>
                                     <div class="login-hero-meta">
+                                        <div class="login-hero-meta-item" style="color: #00ffff; font-weight: bold;">v4.7 更新：全新電郵防重複註冊系統上線</div>
+                                        <div class="login-hero-meta-item">✅ 實裝舊帳號無縫回歸信箱綁定</div>
                                         <div class="login-hero-meta-item">伺服器所在地：雲端資料中心</div>
-                                        <div class="login-hero-meta-item">推薦解析度：1920×1080 以上</div>
-                                        <div class="login-hero-meta-item">推薦瀏覽器：Chrome / Edge 最新版</div>
                                     </div>
                                 </div>
                             </div>
@@ -358,27 +389,69 @@
                     </div>
                     <div class="login-form-side">
                         <div class="modal-header">
-                            <h2>指揮官登入</h2>
+                            <h2 id="auth-modal-title">指揮官登入</h2>
                             <button id="close-login-btn" class="close-btn">&times;</button>
                         </div>
                         <div class="modal-body">
-                            <div class="input-group">
-                                <label for="username">指揮官代號</label>
-                                <input type="text" id="username" placeholder="請輸入代號...">
+                            
+                            <!-- View 1: Login -->
+                            <div id="auth-view-login">
+                                <div class="input-group">
+                                    <label for="login-email">電子郵件 / 舊版代號</label>
+                                    <input type="text" id="login-email" placeholder="請輸入信箱或舊代號...">
+                                </div>
+                                <div class="input-group" style="margin-bottom:15px;">
+                                    <label for="login-password">通訊密碼</label>
+                                    <input type="password" id="login-password" placeholder="請輸入密碼...">
+                                </div>
+                                <button id="btn-submit-login" class="action-btn endless-btn">登入</button>
+                                <button id="btn-goto-register" class="action-btn unit-btn" style="margin-top:8px;">註冊新帳號</button>
+                                <div class="auth-divider"><span>或使用第三方登入繼續</span></div>
+                                <button id="guest-continue-btn" class="small-btn" style="margin-bottom:10px;">以訪客身份體驗</button>
+                                <div id="google-login-container" style="display: flex; justify-content: center;"></div>
                             </div>
-                            <div class="input-group">
-                                <label for="password">通訊密碼</label>
-                                <input type="password" id="password" placeholder="請輸入密碼...">
+
+                            <!-- View 2: Register Step 1 -->
+                            <div id="auth-view-register-step1" class="hidden">
+                                <p style="color:#aaa; font-size:12px; margin-bottom:10px;">防呆機制上線：信箱不可與其他指揮官重複使用。</p>
+                                <div class="input-group">
+                                    <label for="reg-email">設定電子郵件</label>
+                                    <input type="email" id="reg-email" placeholder="請輸入真實信箱...">
+                                </div>
+                                <div class="input-group" style="margin-bottom:15px;">
+                                    <label for="reg-password">設定通訊密碼</label>
+                                    <input type="password" id="reg-password" placeholder="請設定 6 位以上密碼...">
+                                </div>
+                                <button id="btn-reg-next" class="action-btn endless-btn">下一步</button>
+                                <button id="btn-backto-login" class="small-btn delete-btn" style="margin-top:8px;">取消並返回</button>
                             </div>
-                            <button id="auth-submit-btn" class="action-btn endless-btn">登入</button>
-                            <button id="register-submit-btn" class="action-btn unit-btn" style="margin-top:8px;">註冊新帳號</button>
-                            <div class="auth-divider"><span>或使用訪客帳號繼續</span></div>
-                            <button id="guest-continue-btn" class="small-btn" style="margin-bottom:10px;">以訪客身份繼續</button>
-                            <div class="auth-divider"><span>或使用 Google 登入</span></div>
-                            <div id="google-login-container" style="display: flex; justify-content: center; margin-top: 10px;">
-                                <!-- Google Sign-In button will be rendered here -->
+
+                            <!-- View 3: Register Step 2 -->
+                            <div id="auth-view-register-step2" class="hidden">
+                                <p style="color:#aaa; font-size:12px; margin-bottom:10px;">信箱設定完成，請建立您的通訊呼號。<br>名稱必須是伺服器中唯一的標識。</p>
+                                <div class="input-group" style="margin-bottom:15px;">
+                                    <label for="reg-username">指揮官代號 (公開顯示名稱)</label>
+                                    <input type="text" id="reg-username" placeholder="輸入戰場代號...">
+                                </div>
+                                <button id="btn-reg-submit" class="action-btn endless-btn">完成註冊</button>
+                                <button id="btn-reg-back" class="small-btn delete-btn" style="margin-top:8px;">上一步</button>
                             </div>
-                            <p class="modal-tip">登入可同步雲端資料；訪客模式僅儲存在本機。</p>
+
+                            <!-- View 4: Legacy Migration -->
+                            <div id="auth-view-migration" class="hidden">
+                                <p style="color:#00ffff; font-size:14px; margin-bottom:15px; font-weight:bold;">
+                                    ⚠️ 偵測到您為舊版玩家！<br>
+                                    <span style="color:#aaa; font-size:12px; font-weight:normal;">為了保護您的資料與戰績跨設備同步，系統已全面升級為信箱綁定機制。<br>請輸入欲綁定本代號的電子信箱：</span>
+                                </p>
+                                <div class="input-group" style="margin-bottom:15px;">
+                                    <label for="migrate-email">綁定您的電子郵件</label>
+                                    <input type="email" id="migrate-email" placeholder="輸入常用 Email...">
+                                </div>
+                                <button id="btn-submit-migration" class="action-btn endless-btn">完成綁定並登入</button>
+                                <button id="btn-cancel-migration" class="small-btn delete-btn" style="margin-top:8px;">取消登入</button>
+                            </div>
+
+                            <p class="modal-tip" style="margin-top:15px;">登入本機將自動同步雲端資料，無後顧之憂。</p>
                         </div>
                     </div>
                 </div>
@@ -502,6 +575,12 @@
                     </div>
                 </div>
             </div>
+        </div>
+        <div id="mobile-controls" class="hidden">
+            <div id="joystick-base">
+                <div id="joystick-stick"></div>
+            </div>
+            <div id="mobile-skill-btn">🚀</div>
         </div>
     </div>
     <canvas id="gameCanvas"></canvas>
