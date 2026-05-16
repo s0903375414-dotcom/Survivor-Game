@@ -80,14 +80,28 @@
             <div class="stat-item">LEVEL: <span id="level-display">1</span></div>
             <div class="stat-item">SCORE: <span id="score-display">0</span></div>
             <div class="stat-item">HP: <span id="hp-display">100</span></div>
-            <div id="air-support-status" class="skill-status">
-                <div class="skill-icon">✈️</div>
-                <div class="skill-cooldown-bar">
-                    <div id="air-support-fill" class="skill-fill"></div>
-                </div>
-                <div class="skill-key">SPACE</div>
-            </div>
             <button id="in-game-menu-btn" class="mini-btn">ESC - MENU</button>
+        </div>
+
+        <!-- 戰術技能介面 -->
+        <div id="tactical-skill-overlay">
+            <div class="skill-card air-support-card">
+                <div class="skill-icon-container">
+                    <div class="skill-icon-bg"></div>
+                    <span class="skill-icon-main">✈️</span>
+                </div>
+                <div class="skill-info">
+                    <div class="skill-name">空中打擊支援</div>
+                    <div class="skill-progress-container">
+                        <div id="air-support-fill-new" class="skill-progress-fill"></div>
+                        <div class="skill-progress-shimmer"></div>
+                    </div>
+                    <div class="skill-meta">
+                        <span class="skill-key-hint" id="skill-key-label">SPACE</span>
+                        <span id="skill-status-text" class="skill-ready-text">READY</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="air-raid-warning" class="hidden">

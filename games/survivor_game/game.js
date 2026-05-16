@@ -15,7 +15,8 @@ const hpDisplay = document.getElementById('hp-display');
 const scoreDisplay = document.getElementById('score-display');
 const levelDisplay = document.getElementById('level-display');
 const xpBarFill = document.getElementById('xp-bar-fill');
-const airSupportFill = document.getElementById('air-support-fill');
+const airSupportFillNew = document.getElementById('air-support-fill-new');
+const skillStatusText = document.getElementById('skill-status-text');
 const gameOverScreen = document.getElementById('game-over-screen');
 const startScreen = document.getElementById('start-screen');
 const airRaidWarning = document.getElementById('air-raid-warning');
@@ -166,14 +167,17 @@ let joystickVector = { x: 0, y: 0 };
 
 function setControlMode(mode) {
     controlMode = mode;
+    const skillKeyLabel = document.getElementById('skill-key-label');
     if (mode === 'mobile') {
         modeMobileBtn.classList.add('active');
         modePcBtn.classList.remove('active');
         if (gameRunning) mobileControlsUI.classList.remove('hidden');
+        if (skillKeyLabel) skillKeyLabel.textContent = 'TAP ICON';
     } else {
         modePcBtn.classList.add('active');
         modeMobileBtn.classList.remove('active');
         mobileControlsUI.classList.add('hidden');
+        if (skillKeyLabel) skillKeyLabel.textContent = 'SPACE';
     }
     localStorage.setItem('survivor_control_mode', mode);
     if (modeSelectionModal) modeSelectionModal.classList.add('hidden');
@@ -201,8 +205,15 @@ if (modeMobileBtn) modeMobileBtn.addEventListener('click', () => setControlMode(
 // Joystick Logic
 if (joystickBase) {
     joystickBase.addEventListener('touchstart', (e) => {
-        joystickActive = true;
         const touch = e.touches[0];
+        
+        // 如果正在空襲瞄準中，觸摸可用於瞄準
+        if (targetingState.active && !targetingState.locked) {
+            updateTargetingFromTouch(touch);
+            return;
+        }
+
+        joystickActive = true;
         const rect = joystickBase.getBoundingClientRect();
         joystickStartPos = {
             x: rect.left + rect.width / 2,
@@ -213,8 +224,16 @@ if (joystickBase) {
     }, { passive: false });
 
     window.addEventListener('touchmove', (e) => {
+        const touch = e.touches[0];
+        
+        if (targetingState.active && !targetingState.locked) {
+            updateTargetingFromTouch(touch);
+            e.preventDefault();
+            return;
+        }
+
         if (!joystickActive) return;
-        updateJoystick(e.touches[0]);
+        updateJoystick(touch);
         e.preventDefault();
     }, { passive: false });
 
@@ -246,10 +265,23 @@ function updateJoystick(touch) {
     };
 }
 
+function updateTargetingFromTouch(touch) {
+    const rect = canvas.getBoundingClientRect();
+    const tx = touch.clientX - rect.left;
+    const ty = touch.clientY - rect.top;
+    targetingState.x = tx + camera.x;
+    targetingState.y = ty + camera.y;
+}
+
 if (mobileSkillBtn) {
     mobileSkillBtn.addEventListener('touchstart', (e) => {
         if (gameRunning && !isPaused) {
-            requestAirSupport();
+            if (targetingState.active && !targetingState.locked) {
+                targetingState.locked = true;
+                playSound('shoot');
+            } else {
+                requestAirSupport();
+            }
         }
         e.preventDefault();
     }, { passive: false });
@@ -3022,6 +3054,8 @@ function init() {
     moneyDrops = [];
     healthPacks = [];
     explosions = [];
+    fighterJets = [];
+    bombs = [];
     score = 0;
     totalKills = 0;
     isPaused = false;
@@ -3060,14 +3094,23 @@ function updateAirSupportUI() {
     const now = Date.now();
     const timeSinceLast = now - airSupportConfig.lastUsed;
     const progress = Math.min(timeSinceLast / airSupportConfig.cooldown, 1);
-    airSupportFill.style.width = `${progress * 100}%`;
     
-    if (progress >= 1) {
-        airSupportFill.style.background = '#00ffff';
-        airSupportFill.style.boxShadow = '0 0 15px rgba(0, 255, 255, 0.8)';
-    } else {
-        airSupportFill.style.background = '#555';
-        airSupportFill.style.boxShadow = 'none';
+    if (airSupportFillNew) {
+        airSupportFillNew.style.width = `${progress * 100}%`;
+    }
+    
+    if (skillStatusText) {
+        if (progress >= 1) {
+            if (!skillStatusText.classList.contains('active')) {
+                skillStatusText.classList.add('active');
+                skillStatusText.textContent = 'READY';
+                // 只有在剛好冷卻完的一瞬間播放提示音 (可選)
+            }
+        } else {
+            skillStatusText.classList.remove('active');
+            const remaining = Math.ceil((airSupportConfig.cooldown - timeSinceLast) / 1000);
+            skillStatusText.textContent = `${remaining}S`;
+        }
     }
 }
 
@@ -3089,6 +3132,8 @@ function requestAirSupport() {
     targetingState.active = true;
     targetingState.locked = false;
     targetingState.mode = 'manual';
+    targetingState.x = player.x;
+    targetingState.y = player.y;
     createFloatingText(player.x, player.y - 100, "TACTICAL TARGETING ACTIVE", '#00ffff');
     
     const countdownInterval = setInterval(() => {
@@ -3389,9 +3434,12 @@ function updateTargeting() {
     if (!targetingState.active || targetingState.locked) return;
     
     if (targetingState.mode === 'manual') {
-        // Map screen mouse pos to world pos
-        targetingState.x = mouseX + camera.x;
-        targetingState.y = mouseY + camera.y;
+        if (controlMode === 'pc') {
+            // Map screen mouse pos to world pos
+            targetingState.x = mouseX + camera.x;
+            targetingState.y = mouseY + camera.y;
+        }
+        // 在移動端，x/y 會透過 touch 事件直接更新，所以這裡不需要覆蓋
     } else {
         // Auto-Targeting Logic: Find densest cluster
         // Simple heuristic: Find center of all enemies
