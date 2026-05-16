@@ -17,6 +17,7 @@ const levelDisplay = document.getElementById('level-display');
 const xpBarFill = document.getElementById('xp-bar-fill');
 const airSupportFillNew = document.getElementById('air-support-fill-new');
 const skillStatusText = document.getElementById('skill-status-text');
+const tacticalSkillOverlay = document.getElementById('tactical-skill-overlay');
 const gameOverScreen = document.getElementById('game-over-screen');
 const startScreen = document.getElementById('start-screen');
 const airRaidWarning = document.getElementById('air-raid-warning');
@@ -3137,7 +3138,13 @@ function requestAirSupport() {
     createFloatingText(player.x, player.y - 100, "TACTICAL TARGETING ACTIVE", '#00ffff');
     
     const countdownInterval = setInterval(() => {
-        if (!gameRunning || isPaused) return;
+        if (!gameRunning) {
+            clearInterval(countdownInterval);
+            if (airRaidWarning) airRaidWarning.classList.add('hidden');
+            targetingState.active = false;
+            return;
+        }
+        if (isPaused) return;
         
         timeLeft -= 0.1; // Smoother countdown
         if (timeLeft > 0) {
@@ -3790,6 +3797,7 @@ function startGame() {
     gameRunning = true;
     startScreen.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
+    if (tacticalSkillOverlay) tacticalSkillOverlay.classList.remove('hidden');
     if (controlMode === 'mobile') mobileControlsUI.classList.remove('hidden');
     startBackgroundMusic();
     animate();
@@ -3843,6 +3851,8 @@ function endGame() {
     gameRunning = false;
     cancelAnimationFrame(animationId);
     clearInterval(window.enemyInterval);
+    if (tacticalSkillOverlay) tacticalSkillOverlay.classList.add('hidden');
+    if (airRaidWarning) airRaidWarning.classList.add('hidden');
     mobileControlsUI.classList.add('hidden');
     finalScoreDisplay.textContent = score;
     recordScoreToLeaderboard(score);
@@ -3880,6 +3890,8 @@ function showMainMenu() {
     
     cancelAnimationFrame(animationId);
     clearInterval(window.enemyInterval);
+    if (tacticalSkillOverlay) tacticalSkillOverlay.classList.add('hidden');
+    if (airRaidWarning) airRaidWarning.classList.add('hidden');
     mobileControlsUI.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
     startScreen.classList.remove('hidden');
