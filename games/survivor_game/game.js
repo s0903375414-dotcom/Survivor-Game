@@ -3249,7 +3249,7 @@ window.addEventListener('keydown', (e) => {
 resumeBtn.addEventListener('click', togglePause);
 backToMenuBtn.addEventListener('click', () => {
     isPaused = false;
-    gameRunning = false;
+    // 不要在這裡設為 false，讓 showMainMenu 內部處理
     pauseModal.classList.add('hidden');
     showMainMenu();
 });
@@ -3861,6 +3861,7 @@ function showMainMenu() {
     // 如果遊戲正在運行中返回主選單，先儲存當前進度與分數
     if (gameRunning) {
         if (score > 0) {
+            console.log("主動返回選單：儲存分數", score);
             recordScoreToLeaderboard(score);
             const gainedFunds = Math.floor(score * fundsGainMultiplier);
             if (gainedFunds > 0) {
@@ -3869,7 +3870,6 @@ function showMainMenu() {
                 updateFundsUI();
             }
         }
-        updateUserUI(); // 確保最高紀錄顯示已更新
     }
 
     gameRunning = false;
@@ -3884,6 +3884,10 @@ function showMainMenu() {
     gameOverScreen.classList.add('hidden');
     startScreen.classList.remove('hidden');
     
+    // 確保 UI 更新 (最高紀錄等)
+    updateUserUI();
+    renderLeaderboard();
+    
     // Reset background
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -3894,6 +3898,19 @@ function showMainMenu() {
     stopBackgroundMusic();
     startMenuMusic();
 }
+
+// 實作頁面重新整理前的自動儲存機制
+window.addEventListener('beforeunload', () => {
+    if (gameRunning && score > 0) {
+        console.log("頁面重新整理：緊急儲存分數", score);
+        recordScoreToLeaderboard(score);
+        const gainedFunds = Math.floor(score * fundsGainMultiplier);
+        if (gainedFunds > 0) {
+            militaryFunds += gainedFunds;
+            saveMetaProgress();
+        }
+    }
+});
 
 resizeCanvas();
 startMenuBackground();
