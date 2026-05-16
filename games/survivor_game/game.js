@@ -155,6 +155,9 @@ const modeMobileBtn = document.getElementById('mode-mobile-btn');
 const joystickBase = document.getElementById('joystick-base');
 const joystickStick = document.getElementById('joystick-stick');
 const mobileSkillBtn = document.getElementById('mobile-skill-btn');
+const modeSelectionModal = document.getElementById('mode-selection-modal');
+const selectPcBtn = document.getElementById('select-pc-mode');
+const selectMobileBtn = document.getElementById('select-mobile-mode');
 
 let joystickActive = false;
 let joystickStartPos = { x: 0, y: 0 };
@@ -173,16 +176,24 @@ function setControlMode(mode) {
         mobileControlsUI.classList.add('hidden');
     }
     localStorage.setItem('survivor_control_mode', mode);
+    if (modeSelectionModal) modeSelectionModal.classList.add('hidden');
 }
 
 // Initial detection or load from storage
 const savedMode = localStorage.getItem('survivor_control_mode');
 if (savedMode) {
     setControlMode(savedMode);
+    if (modeSelectionModal) modeSelectionModal.classList.add('hidden');
 } else {
+    // 如果沒有存檔，顯示選擇視窗
+    if (modeSelectionModal) modeSelectionModal.classList.remove('hidden');
+    // 預測模式但暫不設定，等待用戶選擇
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    setControlMode(isTouchDevice ? 'mobile' : 'pc');
+    controlMode = isTouchDevice ? 'mobile' : 'pc';
 }
+
+if (selectPcBtn) selectPcBtn.addEventListener('click', () => setControlMode('pc'));
+if (selectMobileBtn) selectMobileBtn.addEventListener('click', () => setControlMode('mobile'));
 
 if (modePcBtn) modePcBtn.addEventListener('click', () => setControlMode('pc'));
 if (modeMobileBtn) modeMobileBtn.addEventListener('click', () => setControlMode('mobile'));
@@ -3171,7 +3182,8 @@ window.addEventListener('keydown', (e) => {
         target.closest('.mini-btn') ||
         target.closest('.action-btn') ||
         target.closest('.small-btn') ||
-        target.closest('.info-btn')
+        target.closest('.info-btn') ||
+        target.closest('.mode-option')
     );
  }
  

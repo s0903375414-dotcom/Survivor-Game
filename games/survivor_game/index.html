@@ -95,6 +95,27 @@
             <div class="warning-timer" id="warning-timer">10.0</div>
         </div>
 
+        <!-- 操作模式選擇彈窗 -->
+        <div id="mode-selection-modal" class="modal">
+            <div class="modal-content mode-selection-content">
+                <h2 class="mode-title">偵測到新連線</h2>
+                <p class="mode-subtitle">請選擇您的指揮裝置類型</p>
+                <div class="mode-options">
+                    <div class="mode-option" id="select-pc-mode">
+                        <div class="mode-icon">💻</div>
+                        <div class="mode-name">電腦端</div>
+                        <div class="mode-desc">WASD 移動 / 滑鼠瞄準</div>
+                    </div>
+                    <div class="mode-option" id="select-mobile-mode">
+                        <div class="mode-icon">📱</div>
+                        <div class="mode-name">移動端</div>
+                        <div class="mode-desc">虛擬搖桿 / 自動瞄準</div>
+                    </div>
+                </div>
+                <p class="mode-footer">稍後可在主選單重新切換</p>
+            </div>
+        </div>
+
         <!-- In-game Menu Modal -->
         <div id="pause-modal" class="modal hidden">
             <div class="modal-content pause-content">
