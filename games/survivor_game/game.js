@@ -19,6 +19,94 @@ const airSupportFillNew = document.getElementById('air-support-fill-new');
 const skillStatusText = document.getElementById('skill-status-text');
 const tacticalSkillOverlay = document.getElementById('tactical-skill-overlay');
 const gameOverScreen = document.getElementById('game-over-screen');
+
+// Settings Elements
+const settingsModal = document.getElementById('settings-modal');
+const settingsTriggerBtn = document.getElementById('settings-trigger-btn');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+const saveSettingsBtn = document.getElementById('save-settings-btn');
+const masterVolumeInput = document.getElementById('setting-master-volume');
+const musicEnabledCheckbox = document.getElementById('setting-music-enabled');
+const sfxEnabledCheckbox = document.getElementById('setting-sfx-enabled');
+const autoAimCheckbox = document.getElementById('setting-auto-aim');
+const screenShakeCheckbox = document.getElementById('setting-screen-shake');
+const showDamageCheckbox = document.getElementById('setting-show-damage');
+const particleQualitySelect = document.getElementById('setting-particle-quality');
+
+// Global Settings State
+let gameSettings = {
+    masterVolume: 70,
+    musicEnabled: true,
+    sfxEnabled: true,
+    autoAim: true,
+    screenShake: true,
+    showDamage: true,
+    particleQuality: 'medium'
+};
+
+function loadSettings() {
+    const saved = localStorage.getItem('survivor_settings');
+    if (saved) {
+        gameSettings = { ...gameSettings, ...JSON.parse(saved) };
+    }
+    applySettings();
+}
+
+function applySettings() {
+    // Sync UI inputs
+    if (masterVolumeInput) masterVolumeInput.value = gameSettings.masterVolume;
+    if (musicEnabledCheckbox) musicEnabledCheckbox.checked = gameSettings.musicEnabled;
+    if (sfxEnabledCheckbox) sfxEnabledCheckbox.checked = gameSettings.sfxEnabled;
+    if (autoAimCheckbox) autoAimCheckbox.checked = gameSettings.autoAim;
+    if (screenShakeCheckbox) screenShakeCheckbox.checked = gameSettings.screenShake;
+    if (showDamageCheckbox) showDamageCheckbox.checked = gameSettings.showDamage;
+    if (particleQualitySelect) particleQualitySelect.value = gameSettings.particleQuality;
+
+    // Apply audio settings
+    if (!gameSettings.musicEnabled) {
+        stopMenuMusic();
+        stopBackgroundMusic();
+    } else if (gameRunning) {
+        startBackgroundMusic();
+    } else {
+        startMenuMusic();
+    }
+}
+
+function saveSettings() {
+    gameSettings = {
+        masterVolume: parseInt(masterVolumeInput.value),
+        musicEnabled: musicEnabledCheckbox.checked,
+        sfxEnabled: sfxEnabledCheckbox.checked,
+        autoAim: autoAimCheckbox.checked,
+        screenShake: screenShakeCheckbox.checked,
+        showDamage: showDamageCheckbox.checked,
+        particleQuality: particleQualitySelect.value
+    };
+    localStorage.setItem('survivor_settings', JSON.stringify(gameSettings));
+    applySettings();
+    settingsModal.classList.add('hidden');
+    createFloatingText(canvas.width/2, canvas.height/2, "設定已儲存", "#00ffff");
+}
+
+if (settingsTriggerBtn) {
+    settingsTriggerBtn.addEventListener('click', () => {
+        settingsModal.classList.remove('hidden');
+    });
+}
+
+if (closeSettingsBtn) {
+    closeSettingsBtn.addEventListener('click', () => {
+        settingsModal.classList.add('hidden');
+    });
+}
+
+if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', saveSettings);
+}
+
+// 在初始化時讀取設定
+loadSettings();
 const startScreen = document.getElementById('start-screen');
 const airRaidWarning = document.getElementById('air-raid-warning');
 const gameNotification = document.getElementById('game-notification');
@@ -337,6 +425,7 @@ let menuBgEntities = [];
 let menuBgPlayer = null;
 
 function playSound(type) {
+    if (!gameSettings.sfxEnabled) return;
     if (audioCtx.state === 'suspended') {
         audioCtx.resume();
     }
@@ -347,13 +436,14 @@ function playSound(type) {
     gainNode.connect(audioCtx.destination);
     
     const now = audioCtx.currentTime;
+    const masterVol = gameSettings.masterVolume / 100;
     
     switch(type) {
         case 'shoot':
             oscillator.type = 'triangle';
             oscillator.frequency.setValueAtTime(400, now);
             oscillator.frequency.exponentialRampToValueAtTime(100, now + 0.1);
-            gainNode.gain.setValueAtTime(0.1, now);
+            gainNode.gain.setValueAtTime(0.1 * masterVol, now);
             gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
             oscillator.start(now);
             oscillator.stop(now + 0.1);
@@ -362,7 +452,7 @@ function playSound(type) {
             oscillator.type = 'sawtooth';
             oscillator.frequency.setValueAtTime(100, now);
             oscillator.frequency.linearRampToValueAtTime(50, now + 0.1);
-            gainNode.gain.setValueAtTime(0.05, now);
+            gainNode.gain.setValueAtTime(0.05 * masterVol, now);
             gainNode.gain.linearRampToValueAtTime(0.01, now + 0.1);
             oscillator.start(now);
             oscillator.stop(now + 0.1);
@@ -371,7 +461,7 @@ function playSound(type) {
             oscillator.type = 'sine';
             oscillator.frequency.setValueAtTime(200, now);
             oscillator.frequency.exponentialRampToValueAtTime(50, now + 0.2);
-            gainNode.gain.setValueAtTime(0.1, now);
+            gainNode.gain.setValueAtTime(0.1 * masterVol, now);
             gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
             oscillator.start(now);
             oscillator.stop(now + 0.2);
@@ -380,7 +470,7 @@ function playSound(type) {
             oscillator.type = 'sine';
             oscillator.frequency.setValueAtTime(800, now);
             oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
-            gainNode.gain.setValueAtTime(0.05, now);
+            gainNode.gain.setValueAtTime(0.05 * masterVol, now);
             gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
             oscillator.start(now);
             oscillator.stop(now + 0.05);
@@ -392,7 +482,7 @@ function playSound(type) {
                 const g = audioCtx.createGain();
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(freq, now + i * 0.1);
-                g.gain.setValueAtTime(0.05, now + i * 0.1);
+                g.gain.setValueAtTime(0.05 * masterVol, now + i * 0.1);
                 g.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.1);
                 osc.connect(g);
                 g.connect(audioCtx.destination);
@@ -417,7 +507,7 @@ function playSound(type) {
             noiseFilter.frequency.exponentialRampToValueAtTime(10, now + 1);
             
             const noiseGain = audioCtx.createGain();
-            noiseGain.gain.setValueAtTime(0.8, now);
+            noiseGain.gain.setValueAtTime(0.8 * masterVol, now);
             noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 1);
 
             noise.connect(noiseFilter);
@@ -429,8 +519,8 @@ function playSound(type) {
             oscillator.type = 'sawtooth';
             oscillator.frequency.setValueAtTime(400, now);
             oscillator.frequency.linearRampToValueAtTime(800, now + 0.5);
-            gainNode.gain.setValueAtTime(0.1, now);
-            gainNode.gain.linearRampToValueAtTime(0.1, now + 0.5);
+            gainNode.gain.setValueAtTime(0.1 * masterVol, now);
+            gainNode.gain.linearRampToValueAtTime(0.1 * masterVol, now + 0.5);
             gainNode.gain.linearRampToValueAtTime(0, now + 1.0);
             oscillator.start(now);
             oscillator.stop(now + 1.0);
@@ -2320,30 +2410,41 @@ class Player {
         let nearestEnemy = null;
         let minDistance = Infinity;
 
-        enemies.forEach(enemy => {
-            const dist = getDistance(this.x, this.y, enemy.x, enemy.y);
-            if (dist < minDistance) {
-                minDistance = dist;
-                nearestEnemy = enemy;
-            }
-        });
+        // 只有在自動瞄準開啟時才尋找最近敵人，否則向鼠標方向射擊
+        if (gameSettings.autoAim || controlMode === 'mobile') {
+            enemies.forEach(enemy => {
+                const dist = getDistance(this.x, this.y, enemy.x, enemy.y);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestEnemy = enemy;
+                }
+            });
+        }
 
+        let angle;
         if (nearestEnemy) {
-            playSound('shoot');
-            const angle = Math.atan2(nearestEnemy.y - this.y, nearestEnemy.x - this.x);
-            
-            // Handle multishot
-            const bulletCount = 1 + playerUpgrades.multishot.level;
-            const spread = 0.2; // radians
-            
-            for (let i = 0; i < bulletCount; i++) {
-                const finalAngle = angle + (i - (bulletCount - 1) / 2) * spread;
-                const velocity = {
-                    x: Math.cos(finalAngle) * config.projectileSpeed,
-                    y: Math.sin(finalAngle) * config.projectileSpeed
-                };
-                projectiles.push(new Projectile(this.x, this.y, velocity));
-            }
+            angle = Math.atan2(nearestEnemy.y - this.y, nearestEnemy.x - this.x);
+        } else if (controlMode === 'pc') {
+            // PC 模式且關閉自動瞄準或沒敵人時，朝向鼠標
+            angle = Math.atan2(mouseY + camera.y - this.y, mouseX + camera.x - this.x);
+        } else {
+            // 移動端若沒敵人則不射擊或朝向移動方向 (此處選擇不射擊)
+            return;
+        }
+
+        playSound('shoot');
+        
+        // Handle multishot
+        const bulletCount = 1 + playerUpgrades.multishot.level;
+        const spread = 0.2; // radians
+        
+        for (let i = 0; i < bulletCount; i++) {
+            const finalAngle = angle + (i - (bulletCount - 1) / 2) * spread;
+            const velocity = {
+                x: Math.cos(finalAngle) * config.projectileSpeed,
+                y: Math.sin(finalAngle) * config.projectileSpeed
+            };
+            projectiles.push(new Projectile(this.x, this.y, velocity));
         }
     }
 
@@ -2369,7 +2470,9 @@ class Player {
 
     takeDamage(amount) {
         this.hp -= amount;
-        screenShake = 10; // Trigger screen shake
+        if (gameSettings.screenShake) {
+            screenShake = 10; // Trigger screen shake
+        }
         createFloatingText(this.x, this.y, `-${amount}`, "#ff0000");
         this.updateUI();
         if (this.hp <= 0) {
@@ -2662,7 +2765,9 @@ class Boss extends Enemy {
             // Deal damage if player is close
             if (distToPlayer < 150) {
                 player.takeDamage(20);
-                screenShake += 10;
+                if (gameSettings.screenShake) {
+                    screenShake += 10;
+                }
             }
             this.currentState = 'normal';
         }
@@ -2826,6 +2931,7 @@ class FloatingText {
     }
 
     draw() {
+        if (this.text.includes('-') && !gameSettings.showDamage) return;
         ctx.save();
         ctx.globalAlpha = this.alpha;
         ctx.fillStyle = this.color;
@@ -3017,7 +3123,9 @@ class Bomb {
             // Explode
             explosions.push(new Explosion(this.x, this.y, airSupportConfig.strikeRadius));
             playSound('explosion');
-            screenShake = 15;
+            if (gameSettings.screenShake) {
+                screenShake = 15;
+            }
             
             // Damage Logic (reused)
             enemies.forEach((enemy) => {
@@ -3085,7 +3193,11 @@ function togglePause() {
         setMusicDuck(true);
     } else {
         pauseModal.classList.add('hidden');
-        setMusicDuck(false);
+        if (gameSettings.musicEnabled) {
+            setMusicDuck(false);
+        } else {
+            stopBackgroundMusic();
+        }
         lastTime = performance.now();
         animate();
     }

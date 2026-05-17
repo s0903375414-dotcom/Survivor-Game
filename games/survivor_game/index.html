@@ -392,6 +392,7 @@
                     </button>
                     <div class="bottom-row">
                         <button id="unit-config-btn" class="action-btn unit-btn">單位配置</button>
+                        <button id="settings-trigger-btn" class="action-btn settings-btn">系統設定</button>
                     </div>
                 </div>
             </div>
@@ -592,6 +593,63 @@
                 <div class="modal-body leaderboard-body">
                     <div id="leaderboard-list"></div>
                     <p class="modal-tip">依據本機遊玩紀錄，僅顯示最高 20 場得分。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系統設定彈窗 -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content settings-modal-content">
+                <div class="modal-header">
+                    <h2>系統設定</h2>
+                    <button id="close-settings-btn" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h3><span class="icon">🔊</span> 音效與音樂</h3>
+                        <div class="setting-item">
+                            <label>主音量</label>
+                            <input type="range" id="setting-master-volume" min="0" max="100" value="70">
+                        </div>
+                        <div class="setting-item">
+                            <label>背景音樂</label>
+                            <input type="checkbox" id="setting-music-enabled" checked>
+                        </div>
+                        <div class="setting-item">
+                            <label>戰鬥音效</label>
+                            <input type="checkbox" id="setting-sfx-enabled" checked>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3><span class="icon">🎮</span> 戰術操作</h3>
+                        <div class="setting-item">
+                            <label>自動瞄準 (移動端建議)</label>
+                            <input type="checkbox" id="setting-auto-aim" checked>
+                        </div>
+                        <div class="setting-item">
+                            <label>螢幕抖動效果</label>
+                            <input type="checkbox" id="setting-screen-shake" checked>
+                        </div>
+                        <div class="setting-item">
+                            <label>傷害數字顯示</label>
+                            <input type="checkbox" id="setting-show-damage" checked>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3><span class="icon">✨</span> 畫面效能</h3>
+                        <div class="setting-item">
+                            <label>粒子特效等級</label>
+                            <select id="setting-particle-quality">
+                                <option value="low">低 (流暢優先)</option>
+                                <option value="medium" selected>中 (平衡)</option>
+                                <option value="high">高 (視覺優先)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button id="save-settings-btn" class="action-btn endless-btn" style="margin-top: 20px;">儲存並套用</button>
                 </div>
             </div>
         </div>
