@@ -2,6 +2,7 @@
   "name": "survivor-game",
   "version": "1.0.0",
   "description": "Survivor Game Desktop Application",
+  "author": "Commander",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -17,12 +18,30 @@
   },
   "build": {
     "appId": "com.survivor.game",
-    "productName": "Survivor Game",
+    "productName": "Survivor Game Evolution",
+    "copyright": "Copyright © 2024 Survivor Team",
     "directories": {
       "output": "dist"
     },
     "win": {
-      "target": "portable"
-    }
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "publish": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Survivor Game"
+    },
+    "files": [
+      "**/*",
+      "!dist/*",
+      "!node_modules/electron/*",
+      "!node_modules/electron-builder/*"
+    ]
   }
 }

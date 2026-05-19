@@ -250,6 +250,8 @@ const selectPcBtn = document.getElementById('select-pc-mode');
 const selectMobileBtn = document.getElementById('select-mobile-mode');
 
 let joystickActive = false;
+let joystickTouchId = null;
+let targetingTouchId = null;
 let joystickStartPos = { x: 0, y: 0 };
 let joystickCurrentPos = { x: 0, y: 0 };
 let joystickVector = { x: 0, y: 0 };
@@ -294,15 +296,11 @@ if (modeMobileBtn) modeMobileBtn.addEventListener('click', () => setControlMode(
 // Joystick Logic
 if (joystickBase) {
     joystickBase.addEventListener('touchstart', (e) => {
-        const touch = e.touches[0];
+        // 搖桿優先處理其區域內的觸控
+        const touch = e.changedTouches[0];
         
-        // 如果正在空襲瞄準中，觸摸可用於瞄準
-        if (targetingState.active && !targetingState.locked) {
-            updateTargetingFromTouch(touch);
-            return;
-        }
-
         joystickActive = true;
+        joystickTouchId = touch.identifier;
         const rect = joystickBase.getBoundingClientRect();
         joystickStartPos = {
             x: rect.left + rect.width / 2,
@@ -310,27 +308,67 @@ if (joystickBase) {
         };
         updateJoystick(touch);
         e.preventDefault();
+        e.stopPropagation(); // 防止冒泡到 window 的瞄準邏輯
+    }, { passive: false });
+
+    window.addEventListener('touchstart', (e) => {
+        // 如果不是搖桿觸控，且正在瞄準，則此觸控可用於瞄準
+        if (targetingState.active && !targetingState.locked) {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (touch.identifier !== joystickTouchId) {
+                    targetingTouchId = touch.identifier;
+                    updateTargetingFromTouch(touch);
+                    break;
+                }
+            }
+        }
     }, { passive: false });
 
     window.addEventListener('touchmove', (e) => {
-        const touch = e.touches[0];
-        
-        if (targetingState.active && !targetingState.locked) {
-            updateTargetingFromTouch(touch);
-            e.preventDefault();
-            return;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            
+            if (touch.identifier === joystickTouchId) {
+                updateJoystick(touch);
+                e.preventDefault();
+            } else if (targetingState.active && !targetingState.locked) {
+                // 如果沒有設定瞄準觸控 ID，或者正是當前觸控 ID，則更新瞄準位置
+                if (targetingTouchId === null || touch.identifier === targetingTouchId) {
+                    targetingTouchId = touch.identifier;
+                    updateTargetingFromTouch(touch);
+                    e.preventDefault();
+                }
+            }
         }
-
-        if (!joystickActive) return;
-        updateJoystick(touch);
-        e.preventDefault();
     }, { passive: false });
 
-    window.addEventListener('touchend', () => {
-        if (!joystickActive) return;
-        joystickActive = false;
-        joystickVector = { x: 0, y: 0 };
-        joystickStick.style.transform = `translate(-50%, -50%)`;
+    window.addEventListener('touchend', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.identifier === joystickTouchId) {
+                joystickActive = false;
+                joystickTouchId = null;
+                joystickVector = { x: 0, y: 0 };
+                joystickStick.style.transform = `translate(-50%, -50%)`;
+            } else if (touch.identifier === targetingTouchId) {
+                targetingTouchId = null;
+            }
+        }
+    });
+
+    window.addEventListener('touchcancel', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.identifier === joystickTouchId) {
+                joystickActive = false;
+                joystickTouchId = null;
+                joystickVector = { x: 0, y: 0 };
+                joystickStick.style.transform = `translate(-50%, -50%)`;
+            } else if (touch.identifier === targetingTouchId) {
+                targetingTouchId = null;
+            }
+        }
     });
 }
 
@@ -373,6 +411,7 @@ if (mobileSkillBtn) {
             }
         }
         e.preventDefault();
+        e.stopPropagation(); // 防止冒泡到 window 的瞄準邏輯
     }, { passive: false });
 }
 
