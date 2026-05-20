@@ -776,6 +776,9 @@ body {
     border-radius: 12px;
     cursor: pointer;
     transition: all 0.3s;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
 }
 
 .mode-option:hover {
@@ -992,6 +995,26 @@ body {
     color: #e6ffff;
     box-shadow: 0 0 16px rgba(0, 255, 255, 0.25);
     pointer-events: auto;
+}
+
+.commander-btn {
+    background: linear-gradient(135deg, #004444, #002222) !important;
+    border: 1px solid #00ffff !important;
+    color: #00ffff !important;
+    margin-top: 10px;
+    font-weight: bold;
+    animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+    0% { box-shadow: 0 0 5px rgba(0, 255, 255, 0.2); }
+    50% { box-shadow: 0 0 15px rgba(0, 255, 255, 0.5); }
+    100% { box-shadow: 0 0 5px rgba(0, 255, 255, 0.2); }
+}
+
+.commander-btn:hover {
+    background: linear-gradient(135deg, #006666, #003333) !important;
+    transform: scale(1.05);
 }
 
 .info-btn {

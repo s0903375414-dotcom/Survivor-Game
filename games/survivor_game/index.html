@@ -76,6 +76,24 @@
                 </div>
             </div>
         </div>
+
+        <!-- 2.5D Chat Commander Robot -->
+        <div id="commander-bot-container" class="hidden">
+            <div class="commander-bot-character">
+                <img src="assets/commander_tutorial.jpg" alt="Commander" id="commander-bot-img">
+            </div>
+            <div class="commander-bot-chat">
+                <div class="chat-header">
+                    <h3>指揮官機器人 2.5D</h3>
+                    <button id="close-bot-btn">&times;</button>
+                </div>
+                <div id="chat-history"></div>
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" placeholder="輸入指令...">
+                    <button id="send-chat-btn">發送</button>
+                </div>
+            </div>
+        </div>
         <div id="stats">
             <div class="stat-item">LEVEL: <span id="level-display">1</span></div>
             <div class="stat-item">SCORE: <span id="score-display">0</span></div>
@@ -167,6 +185,9 @@
                     </button>
                     <button id="replay-tutorial-btn" class="small-btn">
                         <span class="icon">📘</span> 重新新手教學
+                    </button>
+                    <button id="open-commander-bot-btn" class="small-btn commander-btn">
+                        <span class="icon">🤖</span> 聊天指揮官 2.5D
                     </button>
                     <button id="logout-btn" class="small-btn hidden">
                         <span class="icon">⬅️</span> 登出帳號
@@ -398,6 +419,63 @@
             </div>
         </div>
 
+        <!-- 系統設定彈窗 -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content settings-modal-content">
+                <div class="modal-header">
+                    <h2>系統設定</h2>
+                    <button id="close-settings-btn" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h3><span class="icon">🔊</span> 音效與音樂</h3>
+                        <div class="setting-item">
+                            <label>主音量</label>
+                            <input type="range" id="setting-master-volume" min="0" max="100" value="70">
+                        </div>
+                        <div class="setting-item">
+                            <label>背景音樂</label>
+                            <input type="checkbox" id="setting-music-enabled" checked>
+                        </div>
+                        <div class="setting-item">
+                            <label>戰鬥音效</label>
+                            <input type="checkbox" id="setting-sfx-enabled" checked>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3><span class="icon">🎮</span> 戰術操作</h3>
+                        <div class="setting-item">
+                            <label>自動瞄準 (移動端建議)</label>
+                            <input type="checkbox" id="setting-auto-aim" checked>
+                        </div>
+                        <div class="setting-item">
+                            <label>螢幕抖動效果</label>
+                            <input type="checkbox" id="setting-screen-shake" checked>
+                        </div>
+                        <div class="setting-item">
+                            <label>傷害數字顯示</label>
+                            <input type="checkbox" id="setting-show-damage" checked>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3><span class="icon">✨</span> 畫面效能</h3>
+                        <div class="setting-item">
+                            <label>粒子特效等級</label>
+                            <select id="setting-particle-quality">
+                                <option value="low">低 (流暢優先)</option>
+                                <option value="medium" selected>中 (平衡)</option>
+                                <option value="high">高 (視覺優先)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button id="save-settings-btn" class="action-btn endless-btn" style="margin-top: 20px;">儲存並套用</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Level Up Modal -->
         <div id="levelup-modal" class="modal hidden">
             <div class="levelup-container">
@@ -597,63 +675,6 @@
             </div>
         </div>
 
-        <!-- 系統設定彈窗 -->
-        <div id="settings-modal" class="modal hidden">
-            <div class="modal-content settings-modal-content">
-                <div class="modal-header">
-                    <h2>系統設定</h2>
-                    <button id="close-settings-btn" class="close-btn">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="settings-section">
-                        <h3><span class="icon">🔊</span> 音效與音樂</h3>
-                        <div class="setting-item">
-                            <label>主音量</label>
-                            <input type="range" id="setting-master-volume" min="0" max="100" value="70">
-                        </div>
-                        <div class="setting-item">
-                            <label>背景音樂</label>
-                            <input type="checkbox" id="setting-music-enabled" checked>
-                        </div>
-                        <div class="setting-item">
-                            <label>戰鬥音效</label>
-                            <input type="checkbox" id="setting-sfx-enabled" checked>
-                        </div>
-                    </div>
-
-                    <div class="settings-section">
-                        <h3><span class="icon">🎮</span> 戰術操作</h3>
-                        <div class="setting-item">
-                            <label>自動瞄準 (移動端建議)</label>
-                            <input type="checkbox" id="setting-auto-aim" checked>
-                        </div>
-                        <div class="setting-item">
-                            <label>螢幕抖動效果</label>
-                            <input type="checkbox" id="setting-screen-shake" checked>
-                        </div>
-                        <div class="setting-item">
-                            <label>傷害數字顯示</label>
-                            <input type="checkbox" id="setting-show-damage" checked>
-                        </div>
-                    </div>
-
-                    <div class="settings-section">
-                        <h3><span class="icon">✨</span> 畫面效能</h3>
-                        <div class="setting-item">
-                            <label>粒子特效等級</label>
-                            <select id="setting-particle-quality">
-                                <option value="low">低 (流暢優先)</option>
-                                <option value="medium" selected>中 (平衡)</option>
-                                <option value="high">高 (視覺優先)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <button id="save-settings-btn" class="action-btn endless-btn" style="margin-top: 20px;">儲存並套用</button>
-                </div>
-            </div>
-        </div>
-
         <div id="lobby-modal" class="modal hidden">
             <div class="modal-content lobby-modal-content">
                 <div class="modal-header">
@@ -688,6 +709,7 @@
     </div>
     <canvas id="gameCanvas"></canvas>
     <script src="shared_config.js"></script>
-    <script src="game.js"></script>
+    <script src="game.js?v=6"></script>
+    <script src="commander_bot.js?v=6"></script>
 </body>
 </html>

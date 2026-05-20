@@ -1,6 +1,11 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Global State
+var gameRunning = false;
+var isPaused = false;
+var currentUser = null;
+
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -66,7 +71,7 @@ function applySettings() {
     if (!gameSettings.musicEnabled) {
         stopMenuMusic();
         stopBackgroundMusic();
-    } else if (gameRunning) {
+    } else if (typeof gameRunning !== 'undefined' && gameRunning) {
         startBackgroundMusic();
     } else {
         startMenuMusic();
@@ -106,7 +111,6 @@ if (saveSettingsBtn) {
 }
 
 // 在初始化時讀取設定
-loadSettings();
 const startScreen = document.getElementById('start-screen');
 const airRaidWarning = document.getElementById('air-raid-warning');
 const gameNotification = document.getElementById('game-notification');
@@ -204,9 +208,6 @@ const createRoomBtn = document.getElementById('create-room-btn');
 const refreshLobbyBtn = document.getElementById('refresh-lobby-btn');
 
 // Game State
-let currentUser = null;
-let gameRunning = false;
-let isPaused = false;
 let score = 0;
 let totalKills = 0;
 let animationId;
@@ -217,6 +218,32 @@ let ownedUnits = {};
 let equippedUnits = {};
 let fundsGainMultiplier = 1;
 let mouseDown = false;
+
+// Initialize Game
+window.addEventListener('DOMContentLoaded', () => {
+    try {
+        loadSettings();
+    } catch (e) {
+        console.error("Failed to load settings:", e);
+    }
+
+    // Attach Mode Selection Listeners
+    const selectPcBtn = document.getElementById('select-pc-mode');
+    const selectMobileBtn = document.getElementById('select-mobile-mode');
+    
+    if (selectPcBtn) {
+        selectPcBtn.addEventListener('click', () => {
+            console.log("PC mode selected");
+            setControlMode('pc');
+        });
+    }
+    if (selectMobileBtn) {
+        selectMobileBtn.addEventListener('click', () => {
+            console.log("Mobile mode selected");
+            setControlMode('mobile');
+        });
+    }
+});
 
 // Air Support State
 const airSupportConfig = {
@@ -246,8 +273,6 @@ const joystickBase = document.getElementById('joystick-base');
 const joystickStick = document.getElementById('joystick-stick');
 const mobileSkillBtn = document.getElementById('mobile-skill-btn');
 const modeSelectionModal = document.getElementById('mode-selection-modal');
-const selectPcBtn = document.getElementById('select-pc-mode');
-const selectMobileBtn = document.getElementById('select-mobile-mode');
 
 let joystickActive = false;
 let joystickTouchId = null;
@@ -286,9 +311,6 @@ if (savedMode) {
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     controlMode = isTouchDevice ? 'mobile' : 'pc';
 }
-
-if (selectPcBtn) selectPcBtn.addEventListener('click', () => setControlMode('pc'));
-if (selectMobileBtn) selectMobileBtn.addEventListener('click', () => setControlMode('mobile'));
 
 if (modePcBtn) modePcBtn.addEventListener('click', () => setControlMode('pc'));
 if (modeMobileBtn) modeMobileBtn.addEventListener('click', () => setControlMode('mobile'));
