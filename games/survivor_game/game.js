@@ -126,6 +126,10 @@ const highestScoreDisplay = document.getElementById('highest-score-display');
 const deleteAccountBtn = document.getElementById('delete-account-btn');
 const adminClearDataBtn = document.getElementById('admin-clear-data-btn');
 const adminViewFeedbackBtn = document.getElementById('admin-view-feedback-btn');
+const adminViewDataBtn = document.getElementById('admin-view-data-btn');
+const adminDataModal = document.getElementById('admin-data-modal');
+const adminDataList = document.getElementById('admin-data-list');
+const closeAdminDataBtn = document.getElementById('close-admin-data-btn');
 
 // Login UI Elements
 const loginModal = document.getElementById('login-modal');
@@ -1295,6 +1299,81 @@ function renderAdminFeedbacks() {
     });
 }
 
+function renderAdminData() {
+    if (!adminDataList) return;
+    
+    // 獲取所有帳號資料
+    const accountsRaw = localStorage.getItem('survivor_accounts');
+    const accounts = accountsRaw ? JSON.parse(accountsRaw) : {};
+    
+    const accountsV2Raw = localStorage.getItem('survivor_accounts_v2');
+    const accountsV2 = accountsV2Raw ? JSON.parse(accountsV2Raw) : {};
+    
+    adminDataList.innerHTML = '';
+    
+    // 合併並轉換資料格式
+    let allPlayers = [];
+    
+    // 處理 V1 帳號
+    for (const name in accounts) {
+        const funds = localStorage.getItem(`survivor_funds_${name}`) || 0;
+        const score = localStorage.getItem(`survivor_highest_score_${name}`) || 0;
+        const unitsRaw = localStorage.getItem(`survivor_units_owned_${name}`);
+        const units = unitsRaw ? Object.keys(JSON.parse(unitsRaw)).length : 0;
+        
+        allPlayers.push({
+            username: name,
+            uid: accounts[name].uid || 'V1_LEGACY',
+            funds: funds,
+            score: score,
+            units: units
+        });
+    }
+    
+    // 處理 V2 帳號 (Email 綁定)
+    for (const email in accountsV2) {
+        const user = accountsV2[email].user;
+        if (!user) continue;
+        
+        // 檢查是否已在 V1 處理過
+        if (allPlayers.some(p => p.username === user.username)) continue;
+        
+        const funds = localStorage.getItem(`survivor_funds_${user.username}`) || 0;
+        const score = localStorage.getItem(`survivor_highest_score_${user.username}`) || 0;
+        const unitsRaw = localStorage.getItem(`survivor_units_owned_${user.username}`);
+        const units = unitsRaw ? Object.keys(JSON.parse(unitsRaw)).length : 0;
+        
+        allPlayers.push({
+            username: user.username,
+            uid: user.uid,
+            funds: funds,
+            score: score,
+            units: units
+        });
+    }
+    
+    if (allPlayers.length === 0) {
+        adminDataList.innerHTML = '<div style="text-align:center; padding: 20px; color: rgba(255,255,255,0.4);">尚無任何指揮官數據。</div>';
+        return;
+    }
+
+    // 依軍資排序
+    allPlayers.sort((a, b) => b.funds - a.funds);
+
+    allPlayers.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'room-item';
+        item.innerHTML = `
+            <div class="room-name">${p.username}</div>
+            <div class="room-players" style="font-size: 10px;">${p.uid}</div>
+            <div class="room-status" style="color: #ffff00;">💰 ${p.funds}</div>
+            <div class="room-status" style="color: #00ffff;">🏆 ${p.score}</div>
+            <div class="room-action">🎖️ ${p.units} 單位</div>
+        `;
+        adminDataList.appendChild(item);
+    });
+}
+
 function handleAccountDeletion() {
     if (!currentUser) return;
     
@@ -1366,9 +1445,11 @@ function updateUserUI() {
         if (currentUser.isAdmin) {
             adminClearDataBtn.classList.remove('hidden');
             adminViewFeedbackBtn.classList.remove('hidden');
+            adminViewDataBtn.classList.remove('hidden');
         } else {
             adminClearDataBtn.classList.add('hidden');
             adminViewFeedbackBtn.classList.add('hidden');
+            adminViewDataBtn.classList.add('hidden');
         }
     } else {
         displayUserName.textContent = '訪客';
@@ -1378,6 +1459,7 @@ function updateUserUI() {
         deleteAccountBtn.classList.add('hidden');
         adminClearDataBtn.classList.add('hidden');
         adminViewFeedbackBtn.classList.add('hidden');
+        adminViewDataBtn.classList.add('hidden');
         
         // 訪客也應顯示其最高紀錄
         const list = loadLeaderboard();

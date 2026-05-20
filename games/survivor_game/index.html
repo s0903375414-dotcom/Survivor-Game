@@ -201,6 +201,9 @@
                     <button id="admin-view-feedback-btn" class="small-btn admin-btn hidden">
                         <span class="icon">👁️</span> 查看意見反饋
                     </button>
+                    <button id="admin-view-data-btn" class="small-btn admin-btn hidden">
+                        <span class="icon">📊</span> 指揮官數據彙總
+                    </button>
                     <button id="feedback-trigger-btn" class="small-btn feedback-btn">
                         <span class="icon">💬</span> 意見反饋
                     </button>
@@ -700,6 +703,30 @@
                 </div>
             </div>
         </div>
+        <!-- Admin Data Modal -->
+        <div id="admin-data-modal" class="modal hidden">
+            <div class="modal-content lobby-modal-content">
+                <div class="modal-header">
+                    <h2>全體指揮官數據彙總 (開發專用)</h2>
+                    <button id="close-admin-data-btn" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="room-list-container">
+                        <div class="room-list-header">
+                            <span>指揮官</span>
+                            <span>UID</span>
+                            <span>軍資</span>
+                            <span>最高分</span>
+                            <span>解鎖單位</span>
+                        </div>
+                        <div id="admin-data-list" class="room-list">
+                            <!-- Data items will be injected here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="mobile-controls" class="hidden">
             <div id="joystick-base">
                 <div id="joystick-stick"></div>
@@ -709,7 +736,7 @@
     </div>
     <canvas id="gameCanvas"></canvas>
     <script src="shared_config.js"></script>
-    <script src="game.js?v=6"></script>
-    <script src="commander_bot.js?v=6"></script>
+    <script src="game.js?v=7"></script>
+    <script src="commander_bot.js?v=7"></script>
 </body>
 </html>
