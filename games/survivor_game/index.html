@@ -77,23 +77,6 @@
             </div>
         </div>
 
-        <!-- 2.5D Chat Commander Robot -->
-        <div id="commander-bot-container" class="hidden">
-            <div class="commander-bot-character">
-                <img src="assets/commander_tutorial.jpg" alt="Commander" id="commander-bot-img">
-            </div>
-            <div class="commander-bot-chat">
-                <div class="chat-header">
-                    <h3>指揮官機器人 2.5D</h3>
-                    <button id="close-bot-btn">&times;</button>
-                </div>
-                <div id="chat-history"></div>
-                <div class="chat-input-area">
-                    <input type="text" id="chat-input" placeholder="輸入指令...">
-                    <button id="send-chat-btn">發送</button>
-                </div>
-            </div>
-        </div>
         <div id="stats">
             <div class="stat-item">LEVEL: <span id="level-display">1</span></div>
             <div class="stat-item">SCORE: <span id="score-display">0</span></div>
@@ -185,9 +168,6 @@
                     </button>
                     <button id="replay-tutorial-btn" class="small-btn">
                         <span class="icon">📘</span> 重新新手教學
-                    </button>
-                    <button id="open-commander-bot-btn" class="small-btn commander-btn">
-                        <span class="icon">🤖</span> 聊天指揮官 2.5D
                     </button>
                     <button id="logout-btn" class="small-btn hidden">
                         <span class="icon">⬅️</span> 登出帳號
@@ -736,7 +716,6 @@
     </div>
     <canvas id="gameCanvas"></canvas>
     <script src="shared_config.js"></script>
-    <script src="game.js?v=8"></script>
-    <script src="commander_bot.js?v=8"></script>
+    <script src="game.js?v=9"></script>
 </body>
 </html>
