@@ -17,14 +17,14 @@ const SharedConfig = {
         BULLET_DAMAGE: 25
     },
 
-    // 3. 史萊姆生物種類
+    // 3. 戰鬥機械種類 (替代原本的史萊姆)
     SLIME_TYPES: {
-        normal: { color: '#44ff44', speedMult: 1, hpMult: 1, radius: 15, xp: 20 },
-        fast:   { color: '#4488ff', speedMult: 1.8, hpMult: 0.6, radius: 12, xp: 30 },
-        tank:   { color: '#ff4444', speedMult: 0.6, hpMult: 2.5, radius: 22, xp: 50 },
-        elite:  { color: '#aa44ff', speedMult: 1.2, hpMult: 1.8, radius: 20, xp: 100 },
-        gold:   { color: '#ffff44', speedMult: 2.5, hpMult: 0.4, radius: 10, xp: 500 },
-        boss:   { color: '#ff00ff', speedMult: 1.2, hpMult: 40, radius: 60, xp: 2000 }
+        normal: { color: '#8899aa', speedMult: 1, hpMult: 1, radius: 25, xp: 20, name: '偵察型多足機', behavior: 'swarm' },
+        fast:   { color: '#55aaff', speedMult: 1.8, hpMult: 0.6, radius: 20, xp: 30, name: '突擊型劍足機', behavior: 'dash' },
+        tank:   { color: '#ff5544', speedMult: 0.6, hpMult: 3.5, radius: 35, xp: 50, name: '重裝型砲擊機', behavior: 'heavy' },
+        elite:  { color: '#aa88ff', speedMult: 1.2, hpMult: 2.0, radius: 30, xp: 100, name: '指揮型作戰機', behavior: 'balanced' },
+        gold:   { color: '#ffff44', speedMult: 2.5, hpMult: 0.4, radius: 18, xp: 500, name: '高能補給機', behavior: 'flee' },
+        boss:   { color: '#ff00ff', speedMult: 1.2, hpMult: 50, radius: 80, xp: 2000, name: '要塞級：戰術重型機甲', behavior: 'boss' }
     },
 
     // 4. 戰術邏輯

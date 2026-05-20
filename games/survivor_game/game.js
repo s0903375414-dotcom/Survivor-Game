@@ -2690,86 +2690,130 @@ class Enemy {
         this.type = type;
         
         // Base stats
-        let baseSpeed = Math.random() * 1 + 1;
-        let baseHp = 50 + (player.level * 10);
+        let baseSpeed = Math.random() * 0.5 + 1.2;
+        let baseHp = 50 + (player.level * 12);
         
-        // Slime Variety Palette
-        const slimeTypes = {
-            normal: { color: '#44ff44', speedMult: 1, hpMult: 1, radius: 15 },    // 綠色：平衡型
-            fast: { color: '#4488ff', speedMult: 1.8, hpMult: 0.6, radius: 12 },   // 藍色：高速型
-            tank: { color: '#ff4444', speedMult: 0.6, hpMult: 2.5, radius: 22 },   // 紅色：坦克型
-            elite: { color: '#aa44ff', speedMult: 1.2, hpMult: 1.8, radius: 20 },  // 紫色：精英型
-            gold: { color: '#ffff44', speedMult: 2.5, hpMult: 0.4, radius: 10 }    // 黃色：閃金型
-        };
-
-        const config = slimeTypes[type] || slimeTypes.normal;
+        // Use config from shared_config
+        const config = SharedConfig.SLIME_TYPES[type] || SharedConfig.SLIME_TYPES.normal;
         this.color = config.color;
         this.speed = baseSpeed * config.speedMult;
         this.hp = baseHp * config.hpMult;
         this.radius = config.radius;
+        this.name = config.name;
+        
+        // Animation states
+        this.walkCycle = Math.random() * Math.PI * 2;
+        this.angle = 0;
     }
 
     draw() {
         const drawX = this.x - camera.x;
         const drawY = this.y - camera.y;
         const r = this.radius;
+        const time = Date.now() / 1000;
 
         ctx.save();
         ctx.translate(drawX, drawY);
-        
-        // Squish effect based on movement or just constant pulse
-        const pulse = Math.sin(Date.now() / 200) * 0.1;
-        ctx.scale(1 + pulse, 1 - pulse);
+        ctx.rotate(this.angle);
 
-        // Slime body
+        // Walking animation (Legs)
+        const legMovement = Math.sin(time * 10 + this.walkCycle) * 15;
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 4;
+        
+        // Draw 4-6 legs based on type
+        const legCount = this.type === 'tank' ? 6 : 4;
+        for (let i = 0; i < legCount; i++) {
+            ctx.save();
+            ctx.rotate((Math.PI * 2 / legCount) * i);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(r * 0.8, r * 0.8 + (i % 2 === 0 ? legMovement : -legMovement));
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Main Body (Metallic/Futuristic look)
+        const bodyPulse = Math.sin(time * 5) * 2;
+        
+        // Shadow/Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
+
+        // Body Shape
+        ctx.fillStyle = '#222'; // Base dark metal
         ctx.beginPath();
-        ctx.moveTo(-r, r);
-        ctx.quadraticCurveTo(-r, -r, 0, -r);
-        ctx.quadraticCurveTo(r, -r, r, r);
-        ctx.lineTo(-r, r);
+        if (this.type === 'normal') {
+            // Scout: Diamond shape
+            ctx.moveTo(0, -r);
+            ctx.lineTo(r, 0);
+            ctx.lineTo(0, r);
+            ctx.lineTo(-r, 0);
+        } else if (this.type === 'fast') {
+            // Striker: Sharp triangular shape
+            ctx.moveTo(r * 1.2, 0);
+            ctx.lineTo(-r * 0.8, -r * 0.8);
+            ctx.lineTo(-r * 0.5, 0);
+            ctx.lineTo(-r * 0.8, r * 0.8);
+        } else if (this.type === 'tank') {
+            // Tank: Hexagon heavy shape
+            for(let i=0; i<6; i++) {
+                const a = (Math.PI * 2 / 6) * i;
+                const px = Math.cos(a) * r;
+                const py = Math.sin(a) * r;
+                if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+        } else {
+            // Default: Circular tech pod
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Tech lines / Core
+        ctx.shadowBlur = 10;
         ctx.fillStyle = this.color;
-        ctx.fill();
-        
-        // Slime highlight
         ctx.beginPath();
-        ctx.arc(-r/3, -r/3, r/4, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.arc(0, 0, r * 0.3 + bodyPulse, 0, Math.PI * 2);
         ctx.fill();
 
-        // Eyes
-        ctx.fillStyle = '#000';
+        // Eye / Sensor
+        ctx.fillStyle = '#fff';
         ctx.beginPath();
-        ctx.arc(-r/3, 0, r/6, 0, Math.PI * 2);
-        ctx.arc(r/3, 0, r/6, 0, Math.PI * 2);
+        ctx.arc(r * 0.4, 0, r * 0.15, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
     }
 
     update() {
-        const angle = Math.atan2(player.y - this.y, player.x - this.x);
-        this.x += Math.cos(angle) * this.speed;
-        this.y += Math.sin(angle) * this.speed;
+        this.angle = Math.atan2(player.y - this.y, player.x - this.x);
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
     }
 }
 
 class Boss extends Enemy {
     constructor(x, y) {
-        super(x, y, 'elite');
-        this.radius = 60;
+        super(x, y, 'boss');
+        this.radius = 80;
         
-        // Scaling Boss Power based on how many have been killed
+        // Scaling Boss Power
         const bossLevel = Math.floor(totalKills / 100);
+        const config = SharedConfig.SLIME_TYPES.boss;
         this.hp = 2000 + (player.level * 500) + (bossLevel * 1000);
         this.maxHp = this.hp;
-        this.speed = 1.2 + (bossLevel * 0.1);
-        this.color = '#ff00ff'; 
+        this.speed = config.speedMult + (bossLevel * 0.1);
+        this.color = config.color; 
         this.isBoss = true;
         
         // Skill management
         this.skillTimer = Date.now();
-        this.skillCooldown = 3000; // Skill every 3 seconds
-        this.currentState = 'normal'; // normal, charging, jumping, shockwave
+        this.skillCooldown = 3000;
+        this.currentState = 'normal';
         this.chargeTime = 0;
         this.jumpTarget = { x: 0, y: 0 };
     }
@@ -2778,13 +2822,14 @@ class Boss extends Enemy {
         const drawX = this.x - camera.x;
         const drawY = this.y - camera.y;
         const r = this.radius;
+        const time = Date.now() / 1000;
 
         ctx.save();
         ctx.translate(drawX, drawY);
-        
+
         // Boss Aura (Scales with HP)
         const auraAlpha = 0.2 + (1 - this.hp / this.maxHp) * 0.4;
-        const auraSize = r + 10 + Math.sin(Date.now() / 100) * 10;
+        const auraSize = r + 20 + Math.sin(time * 5) * 15;
         const gradient = ctx.createRadialGradient(0, 0, r, 0, 0, auraSize);
         gradient.addColorStop(0, `rgba(255, 0, 255, ${auraAlpha})`);
         gradient.addColorStop(1, 'rgba(255, 0, 255, 0)');
@@ -2798,31 +2843,62 @@ class Boss extends Enemy {
             ctx.beginPath();
             ctx.arc(0, 0, auraSize * 1.5, 0, Math.PI * 2);
             ctx.strokeStyle = '#ff0000';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 3;
+            ctx.setLineDash([10, 10]);
             ctx.stroke();
             ctx.setLineDash([]);
         }
 
-        // Boss Body
-        const pulse = Math.sin(Date.now() / 150) * 0.15;
-        const rageScale = 1 + (1 - this.hp / this.maxHp) * 0.3; // Get bigger when low HP
-        ctx.scale((1 + pulse) * rageScale, (1 - pulse) * rageScale);
+        // Heavy Mech Body
+        ctx.rotate(this.angle);
+        
+        // Legs (8 legs for boss)
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 8;
+        const legMovement = Math.sin(time * 8) * 20;
+        for(let i=0; i<8; i++) {
+            ctx.save();
+            ctx.rotate((Math.PI * 2 / 8) * i);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(r * 0.9, r * 0.9 + (i%2===0 ? legMovement : -legMovement));
+            ctx.stroke();
+            ctx.restore();
+        }
 
+        // Main Fortress Body
+        const rageScale = 1 + (1 - this.hp / this.maxHp) * 0.3;
+        ctx.scale(rageScale, rageScale);
+        
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = this.color;
+        
+        ctx.fillStyle = '#111';
         ctx.beginPath();
-        ctx.moveTo(-r, r);
-        ctx.quadraticCurveTo(-r, -r, 0, -r);
-        ctx.quadraticCurveTo(r, -r, r, r);
-        ctx.lineTo(-r, r);
+        // Octagon Fortress
+        for(let i=0; i<8; i++) {
+            const a = (Math.PI * 2 / 8) * i;
+            const px = Math.cos(a) * r;
+            const py = Math.sin(a) * r;
+            if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // Core & Energy lines
         ctx.fillStyle = this.color;
-        if (this.currentState === 'charging') ctx.fillStyle = '#ff4444';
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.4 + Math.sin(time * 10) * 5, 0, Math.PI * 2);
         ctx.fill();
         
-        // Eyes (Glow when charging)
-        ctx.fillStyle = this.currentState === 'charging' ? '#fff' : '#ff0000';
+        // Dual Sensors
+        ctx.fillStyle = '#fff';
         ctx.beginPath();
-        ctx.arc(-r/3, -r/10, r/5, 0, Math.PI * 2);
-        ctx.arc(r/3, -r/10, r/5, 0, Math.PI * 2);
+        ctx.arc(r * 0.5, -r * 0.2, r * 0.1, 0, Math.PI * 2);
+        ctx.arc(r * 0.5, r * 0.2, r * 0.1, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.restore();
@@ -2831,17 +2907,16 @@ class Boss extends Enemy {
         ctx.save();
         ctx.translate(drawX, drawY);
         ctx.fillStyle = '#222';
-        ctx.fillRect(-r, -r - 30, r * 2, 10);
-        ctx.fillStyle = '#ff00ff';
-        ctx.fillRect(-r, -r - 30, (r * 2) * (this.hp / this.maxHp), 10);
+        ctx.fillRect(-r, -r - 40, r * 2, 15);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-r, -r - 40, (r * 2) * (this.hp / this.maxHp), 15);
         ctx.strokeStyle = '#fff';
-        ctx.strokeRect(-r, -r - 30, r * 2, 10);
+        ctx.strokeRect(-r, -r - 40, r * 2, 15);
         
-        // Boss Title
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 14px Arial';
+        ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(`LV.${Math.floor(totalKills/100) + 1} 墮落史萊姆王`, 0, -r - 40);
+        ctx.fillText(`WARNING: ${this.name}`, 0, -r - 55);
         ctx.restore();
     }
 
