@@ -13,6 +13,17 @@
     <link rel="apple-touch-icon" href="assets/commander_tutorial.jpg">
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <!-- Firebase SDK (8.x 版本，較穩定相容性好) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <!-- 載入 Firebase 設定 (請建立 firebase-config.js 填入您的設定) -->
+    <script src="firebase-config.js" onerror="console.warn('找不到 firebase-config.js，將使用本地模式')"></script>
+    
+    <!-- 新的資料管理員 -->
+    <script src="data-manager.js"></script>
 </head>
 <body>
     <div id="ui-layer">

@@ -1015,10 +1015,28 @@ function handleBtnRegNext() {
     showAuthView('register-step2');
 }
 
-function handleBtnRegSubmit() {
+async function handleBtnRegSubmit() {
     const username = regUsernameInput ? regUsernameInput.value.trim() : '';
+    const email = tempRegData.email;
+    const password = tempRegData.password;
+    
     if (!username) { alert('請輸入指揮官代號'); return; }
     
+    // 優先使用 Firebase 註冊
+    if (typeof DataManager !== 'undefined' && DataManager.isFirebaseEnabled()) {
+        const result = await DataManager.register(email, password, username);
+        if (result.success) {
+            currentUser = result.user;
+            tempRegData = { email: '', password: '' };
+            completeLoginFlow();
+            return;
+        } else {
+            alert('註冊失敗：' + result.error);
+            return;
+        }
+    }
+    
+    // 舊版系統作為後備
     if (isUsernameTaken(username)) {
         alert('此指揮官代號已被使用，請更換其他名稱。');
         return;
@@ -1040,7 +1058,6 @@ function handleBtnRegSubmit() {
     v2Accounts[tempRegData.email] = { password: tempRegData.password, user: currentUser };
     localStorage.setItem('survivor_accounts_v2', JSON.stringify(v2Accounts));
     
-    // 註冊後立即備份
     backupAccountData();
     
     tempRegData = { email: '', password: '' };
@@ -1059,7 +1076,7 @@ function handleBtnRegSubmit() {
     showTutorialIfNeeded();
 }
 
-function handleBtnSubmitLogin() {
+async function handleBtnSubmitLogin() {
     const emailOrOldId = loginEmailInput ? loginEmailInput.value.trim() : '';
     const password = loginPasswordInput ? loginPasswordInput.value.trim() : '';
     
@@ -1074,6 +1091,20 @@ function handleBtnSubmitLogin() {
         return;
     }
     
+    // 優先使用 Firebase 登入
+    if (typeof DataManager !== 'undefined' && DataManager.isFirebaseEnabled()) {
+        const result = await DataManager.login(emailOrOldId, password);
+        if (result.success) {
+            currentUser = result.user;
+            completeLoginFlow();
+            return;
+        } else {
+            alert('登入失敗：' + result.error);
+            return;
+        }
+    }
+    
+    // 舊版系統作為後備
     const v2Raw = localStorage.getItem('survivor_accounts_v2');
     const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
     
@@ -1543,8 +1574,14 @@ function updateFundsUI() {
     }
 }
 
-function renderLeaderboard() {
-    const list = loadLeaderboard();
+async function renderLeaderboard() {
+    // 優先使用 DataManager 取得排行榜
+    let list;
+    if (typeof DataManager !== 'undefined') {
+        list = await DataManager.getLeaderboard();
+    } else {
+        list = loadLeaderboard();
+    }
     
     // 1. Render for modal
     if (leaderboardList) {
@@ -1609,8 +1646,14 @@ function saveLeaderboard(list) {
     localStorage.setItem('survivor_leaderboard', JSON.stringify(list));
 }
 
-function recordScoreToLeaderboard(finalScore) {
+async function recordScoreToLeaderboard(finalScore) {
     if (!finalScore || finalScore <= 0) return;
+    
+    // 優先使用 DataManager 提交分數
+    if (typeof DataManager !== 'undefined') {
+        await DataManager.submitScore(finalScore);
+    }
+    
     const name = currentUser && currentUser.username ? currentUser.username : '訪客';
     const list = loadLeaderboard();
     list.push({ name, score: finalScore, time: Date.now() });
@@ -1793,7 +1836,19 @@ function menuBgLoop(timestamp) {
     menuBgAnimationId = requestAnimationFrame(menuBgLoop);
 }
 
-function saveMetaProgress() {
+async function saveMetaProgress() {
+    const data = {
+        funds: militaryFunds,
+        unitsOwned: ownedUnits,
+        unitsEquipped: equippedUnits
+    };
+    
+    // 優先使用 DataManager 存到雲端
+    if (typeof DataManager !== 'undefined') {
+        await DataManager.saveProgress(data);
+    }
+    
+    // 同時也存到本地當備份
     const prefix = currentUser ? `_${currentUser.username}` : '';
     localStorage.setItem(`survivor_funds${prefix}`, String(militaryFunds));
     localStorage.setItem(`survivor_units_owned${prefix}`, JSON.stringify(ownedUnits));
