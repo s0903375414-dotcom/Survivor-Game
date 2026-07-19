@@ -68,6 +68,7 @@ function applySettings() {
     if (particleQualitySelect) particleQualitySelect.value = gameSettings.particleQuality;
 
     // Apply audio settings
+    updateGlobalVolume();
     if (!gameSettings.musicEnabled) {
         stopMenuMusic();
         stopBackgroundMusic();
@@ -75,6 +76,26 @@ function applySettings() {
         startBackgroundMusic();
     } else {
         startMenuMusic();
+    }
+}
+
+// 即時更新目前播放音訊的音量
+function updateGlobalVolume() {
+    const masterVol = gameSettings.masterVolume / 100;
+    const now = audioCtx.currentTime;
+    
+    // 更新選單音樂音量 (基礎音量 0.6)
+    if (menuGainNode && menuMusicPlaying) {
+        menuGainNode.gain.cancelScheduledValues(now);
+        menuGainNode.gain.setValueAtTime(menuGainNode.gain.value, now);
+        menuGainNode.gain.linearRampToValue(0.6 * masterVol, now + 0.1);
+    }
+    
+    // 更新遊戲音樂音量 (基礎音量 0.6)
+    if (gameGainNode && gameAudio) {
+        gameGainNode.gain.cancelScheduledValues(now);
+        gameGainNode.gain.setValueAtTime(gameGainNode.gain.value, now);
+        gameGainNode.gain.linearRampToValue(0.6 * masterVol, now + 0.1);
     }
 }
 
@@ -108,6 +129,37 @@ if (closeSettingsBtn) {
 
 if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', saveSettings);
+}
+
+// 即時音量控制
+if (masterVolumeInput) {
+    masterVolumeInput.addEventListener('input', () => {
+        gameSettings.masterVolume = parseInt(masterVolumeInput.value);
+        updateGlobalVolume();
+        // 這裡不自動存入 localStorage，等到玩家按「儲存」才真正儲存
+    });
+}
+
+// 即時音樂開關
+if (musicEnabledCheckbox) {
+    musicEnabledCheckbox.addEventListener('change', () => {
+        gameSettings.musicEnabled = musicEnabledCheckbox.checked;
+        if (!gameSettings.musicEnabled) {
+            stopMenuMusic();
+            stopBackgroundMusic();
+        } else if (gameRunning) {
+            startBackgroundMusic();
+        } else {
+            startMenuMusic();
+        }
+    });
+}
+
+// 即時音效開關
+if (sfxEnabledCheckbox) {
+    sfxEnabledCheckbox.addEventListener('change', () => {
+        gameSettings.sfxEnabled = sfxEnabledCheckbox.checked;
+    });
 }
 
 // 在初始化時讀取設定
