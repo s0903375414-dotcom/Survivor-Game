@@ -1040,6 +1040,9 @@ function handleBtnRegSubmit() {
     v2Accounts[tempRegData.email] = { password: tempRegData.password, user: currentUser };
     localStorage.setItem('survivor_accounts_v2', JSON.stringify(v2Accounts));
     
+    // 註冊後立即備份
+    backupAccountData();
+    
     tempRegData = { email: '', password: '' };
     
     saveUserSession();
@@ -1141,6 +1144,9 @@ function handleBtnSubmitMigration() {
     delete oldAccounts[tempMigrationData.username];
     localStorage.setItem('survivor_accounts', JSON.stringify(oldAccounts));
     
+    // 遷移後立即備份
+    backupAccountData();
+    
     currentUser = tempMigrationData.userObj;
     tempMigrationData = { username: '', password: '', userObj: null };
     
@@ -1187,6 +1193,10 @@ function handleGoogleLogin(response) {
                 email: googleUser.email,
                 picture: googleUser.picture
             };
+            
+            // Google 綁定後立即備份
+            backupAccountData();
+            
             saveUserSession();
             loadMetaProgress();
             updateUserUI();
@@ -1236,6 +1246,11 @@ function handleGoogleLogin(response) {
                 email: googleUser.email,
                 picture: googleUser.picture
             };
+            
+            // 新建立 Google 帳號後立即備份
+            bindings[seed] = { username: currentUser.username, uid: currentUser.uid };
+            localStorage.setItem('survivor_google_bindings', JSON.stringify(bindings));
+            backupAccountData();
         }
 
         saveUserSession();
@@ -1867,17 +1882,123 @@ function toggleEquipUnit(id) {
     renderUnitShop();
 }
 
+// 檢查帳號是否真實存在於註冊列表中
+function isAccountValid(userObj) {
+    if (!userObj || !userObj.username) return false;
+    
+    // 檢查 V1 帳號
+    const accountsRaw = localStorage.getItem('survivor_accounts');
+    const oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
+    if (oldAccounts[userObj.username]) return true;
+    
+    // 檢查 V2 帳號
+    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
+    for (const email in v2Accounts) {
+        if (v2Accounts[email] && v2Accounts[email].user && v2Accounts[email].user.username === userObj.username) {
+            return true;
+        }
+    }
+    
+    // 檢查 Google 綁定
+    const bindingsRaw = localStorage.getItem('survivor_google_bindings');
+    const bindings = bindingsRaw ? JSON.parse(bindingsRaw) : {};
+    for (const key in bindings) {
+        if (bindings[key] && bindings[key].username === userObj.username) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// 帳號備份機制：自動將重要帳號資料備份到多個 key
+function backupAccountData() {
+    try {
+        // 備份 V2 帳號
+        const v2Raw = localStorage.getItem('survivor_accounts_v2');
+        if (v2Raw) {
+            localStorage.setItem('survivor_accounts_v2_backup', v2Raw);
+        }
+        
+        // 備份 V1 帳號
+        const accRaw = localStorage.getItem('survivor_accounts');
+        if (accRaw) {
+            localStorage.setItem('survivor_accounts_backup', accRaw);
+        }
+        
+        // 備份 Google 綁定
+        const bindRaw = localStorage.getItem('survivor_google_bindings');
+        if (bindRaw) {
+            localStorage.setItem('survivor_google_bindings_backup', bindRaw);
+        }
+        
+        console.log("帳號資料備份完成。");
+    } catch (e) {
+        console.warn("帳號備份失敗:", e);
+    }
+}
+
+// 從備份中恢復帳號資料（如果主要資料損壞）
+function restoreAccountData() {
+    try {
+        // 檢查主要 V2 帳號是否遺失
+        const v2Raw = localStorage.getItem('survivor_accounts_v2');
+        if (!v2Raw || v2Raw === '{}') {
+            const backup = localStorage.getItem('survivor_accounts_v2_backup');
+            if (backup) {
+                localStorage.setItem('survivor_accounts_v2', backup);
+                console.log("已從備份恢復 V2 帳號資料。");
+            }
+        }
+        
+        // 檢查主要 V1 帳號是否遺失
+        const accRaw = localStorage.getItem('survivor_accounts');
+        if (!accRaw || accRaw === '{}') {
+            const backup = localStorage.getItem('survivor_accounts_backup');
+            if (backup) {
+                localStorage.setItem('survivor_accounts', backup);
+                console.log("已從備份恢復 V1 帳號資料。");
+            }
+        }
+        
+        // 檢查 Google 綁定是否遺失
+        const bindRaw = localStorage.getItem('survivor_google_bindings');
+        if (!bindRaw || bindRaw === '{}') {
+            const backup = localStorage.getItem('survivor_google_bindings_backup');
+            if (backup) {
+                localStorage.setItem('survivor_google_bindings', backup);
+                console.log("已從備份恢復 Google 綁定資料。");
+            }
+        }
+    } catch (e) {
+        console.warn("恢復帳號備份失敗:", e);
+    }
+}
+
 // Check for saved user on load
 function checkSavedUser() {
     console.log("正在檢查儲存的登入狀態...");
+    
+    // 先嚐試從備份恢復資料
+    restoreAccountData();
+    
     try {
         const saved = localStorage.getItem('survivor_user');
         if (saved && saved !== 'null' && saved !== 'undefined') {
             const parsed = JSON.parse(saved);
             if (parsed && parsed.username) {
-                currentUser = parsed;
-                console.log("已恢復登入狀態:", currentUser.username);
-                loadMetaProgress(); 
+                // 驗證帳號是否真實存在
+                if (isAccountValid(parsed)) {
+                    currentUser = parsed;
+                    console.log("已恢復登入狀態:", currentUser.username);
+                    loadMetaProgress(); 
+                } else {
+                    console.warn("偵測到損毀的登入狀態，已自動登出。");
+                    currentUser = null;
+                    localStorage.removeItem('survivor_user');
+                    loadMetaProgress();
+                }
             } else {
                 currentUser = null;
                 loadMetaProgress();
