@@ -6,6 +6,11 @@ var gameRunning = false;
 var isPaused = false;
 var currentUser = null;
 
+// 取得 gameRunning 的安全存取包裝，避免早期載入的暫時性死區
+function isGameRunning() {
+    try { return !!gameRunning; } catch (e) { return false; }
+}
+
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -68,34 +73,17 @@ function applySettings() {
     if (particleQualitySelect) particleQualitySelect.value = gameSettings.particleQuality;
 
     // Apply audio settings
-    updateGlobalVolume();
-    if (!gameSettings.musicEnabled) {
-        stopMenuMusic();
-        stopBackgroundMusic();
-    } else if (typeof gameRunning !== 'undefined' && gameRunning) {
-        startBackgroundMusic();
-    } else {
-        startMenuMusic();
-    }
-}
-
-// 即時更新目前播放音訊的音量
-function updateGlobalVolume() {
-    const masterVol = gameSettings.masterVolume / 100;
-    const now = audioCtx.currentTime;
-    
-    // 更新選單音樂音量 (基礎音量 0.6)
-    if (menuGainNode && menuMusicPlaying) {
-        menuGainNode.gain.cancelScheduledValues(now);
-        menuGainNode.gain.setValueAtTime(menuGainNode.gain.value, now);
-        menuGainNode.gain.linearRampToValue(0.6 * masterVol, now + 0.1);
-    }
-    
-    // 更新遊戲音樂音量 (基礎音量 0.6)
-    if (gameGainNode && gameAudio) {
-        gameGainNode.gain.cancelScheduledValues(now);
-        gameGainNode.gain.setValueAtTime(gameGainNode.gain.value, now);
-        gameGainNode.gain.linearRampToValue(0.6 * masterVol, now + 0.1);
+    try {
+        if (!gameSettings.musicEnabled) {
+            stopMenuMusic();
+            stopBackgroundMusic();
+        } else if (isGameRunning()) {
+            startBackgroundMusic();
+        } else {
+            startMenuMusic();
+        }
+    } catch (e) {
+        // 早期初始化時忽略音樂設定錯誤
     }
 }
 
@@ -112,8 +100,27 @@ function saveSettings() {
     localStorage.setItem('survivor_settings', JSON.stringify(gameSettings));
     applySettings();
     settingsModal.classList.add('hidden');
-    createFloatingText(canvas.width/2, canvas.height/2, "設定已儲存", "#00ffff");
+    createFloatingText(canvas.width/2, canvas.height/2, t('設定已儲存'), "#00ffff");
 }
+
+// 語言切換接線:#setting-language → I18N.setLang() → localStorage + 全域套用
+(function () {
+    const sel = document.getElementById('setting-language');
+    if (!sel) return;
+    sel.value = (typeof I18N !== 'undefined') ? I18N.getLang() : 'zh';
+    sel.addEventListener('change', () => {
+        if (typeof I18N !== 'undefined') I18N.setLang(sel.value);
+    });
+    // 切換語言時通知動態面板重繪(房間列表等)
+    window.onLanguageChange = function () {
+        try {
+            if (typeof multiplayer !== 'undefined' && multiplayer && typeof lobbyModal !== 'undefined' &&
+                lobbyModal && !lobbyModal.classList.contains('hidden') && multiplayer.requestRoomList) {
+                multiplayer.requestRoomList();
+            }
+        } catch (e) { /* 重繪失敗不阻斷 */ }
+    };
+})();
 
 if (settingsTriggerBtn) {
     settingsTriggerBtn.addEventListener('click', () => {
@@ -129,37 +136,6 @@ if (closeSettingsBtn) {
 
 if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', saveSettings);
-}
-
-// 即時音量控制
-if (masterVolumeInput) {
-    masterVolumeInput.addEventListener('input', () => {
-        gameSettings.masterVolume = parseInt(masterVolumeInput.value);
-        updateGlobalVolume();
-        // 這裡不自動存入 localStorage，等到玩家按「儲存」才真正儲存
-    });
-}
-
-// 即時音樂開關
-if (musicEnabledCheckbox) {
-    musicEnabledCheckbox.addEventListener('change', () => {
-        gameSettings.musicEnabled = musicEnabledCheckbox.checked;
-        if (!gameSettings.musicEnabled) {
-            stopMenuMusic();
-            stopBackgroundMusic();
-        } else if (gameRunning) {
-            startBackgroundMusic();
-        } else {
-            startMenuMusic();
-        }
-    });
-}
-
-// 即時音效開關
-if (sfxEnabledCheckbox) {
-    sfxEnabledCheckbox.addEventListener('change', () => {
-        gameSettings.sfxEnabled = sfxEnabledCheckbox.checked;
-    });
 }
 
 // 在初始化時讀取設定
@@ -313,11 +289,11 @@ const airSupportConfig = {
 
 // Upgrades State
 const playerUpgrades = {
-    multishot: { level: 0, maxLevel: Infinity, name: '火力網擴張', desc: '同步發射更多彈藥', icon: '🎯' },
-    fireRate: { level: 0, maxLevel: Infinity, name: '射控優化', desc: '降低射擊冷卻時間', icon: '⚡' },
-    damage: { level: 0, maxLevel: Infinity, name: '高能彈頭', desc: '強化子彈視覺與威力', icon: '📈' },
-    speed: { level: 0, maxLevel: Infinity, name: '推進強化', desc: '提升戰術移動速度', icon: '💨' },
-    hp: { level: 0, maxLevel: Infinity, name: '修復奈米', desc: '自動修復受損裝甲', icon: '🛡️' }
+    multishot: { level: 0, maxLevel: Infinity, name: t('火力網擴張'), desc: t('同步發射更多彈藥'), icon: '🎯' },
+    fireRate: { level: 0, maxLevel: Infinity, name: t('射控優化'), desc: t('降低射擊冷卻時間'), icon: '⚡' },
+    damage: { level: 0, maxLevel: Infinity, name: t('高能彈頭'), desc: t('強化子彈視覺與威力'), icon: '📈' },
+    speed: { level: 0, maxLevel: Infinity, name: t('推進強化'), desc: t('提升戰術移動速度'), icon: '💨' },
+    hp: { level: 0, maxLevel: Infinity, name: t('修復奈米'), desc: t('自動修復受損裝甲'), icon: '🛡️' }
 };
 
 // Control Mode State
@@ -707,22 +683,22 @@ const config = {
 const unitDefinitions = {
     drone: {
         id: 'drone',
-        name: '攻擊無人機中隊',
-        desc: '開局即獲得額外火力，每次射擊多一發子彈。',
+        name: t('攻擊無人機中隊'),
+        desc: t('開局即獲得額外火力，每次射擊多一發子彈。'),
         cost: 5000,
         icon: '🛸'
     },
     medic: {
         id: 'medic',
-        name: '前線醫療小隊',
-        desc: '提升最大生命值並在出戰時完全修復裝甲。',
+        name: t('前線醫療小隊'),
+        desc: t('提升最大生命值並在出戰時完全修復裝甲。'),
         cost: 4000,
         icon: '⛑️'
     },
     logistics: {
         id: 'logistics',
-        name: '後勤補給線',
-        desc: '提升軍資獲取效率，戰後可獲得更多軍資。',
+        name: t('後勤補給線'),
+        desc: t('提升軍資獲取效率，戰後可獲得更多軍資。'),
         cost: 6000,
         icon: '📦'
     }
@@ -834,11 +810,11 @@ let tutorialGuide = {
     active: false,
     step: 0,
     lines: [
-        "指揮官，歡迎加入。我是本次行動的導引官，將協助你完成初次部署。",
-        "基本操作：以鍵盤 WASD 移動，滑鼠指向即可自動射擊。",
-        "現在進入戰區，熟悉射擊與走位。必要時按下空白鍵呼叫空襲支援。",
-        "保持距離、持續輸出，注意血量與經驗球。達到升級時選擇系統強化。",
-        "行動結束後會結算軍資並更新戰績。祝你旗開得勝。"
+        t('指揮官，歡迎加入。我是本次行動的導引官，將協助你完成初次部署。'),
+        t('基本操作：以鍵盤 WASD 移動，滑鼠指向即可自動射擊。'),
+        t('現在進入戰區，熟悉射擊與走位。必要時按下空白鍵呼叫空襲支援。'),
+        t('保持距離、持續輸出，注意血量與經驗球。達到升級時選擇系統強化。'),
+        t('行動結束後會結算軍資並更新戰績。祝你旗開得勝。')
     ],
     show(text) {
         if (commanderGuide && guideText) {
@@ -904,7 +880,7 @@ function isCurrentUserBound() {
 function updateBindingUI() {
     const bound = isCurrentUserBound();
     if (bindingStatus) {
-        bindingStatus.textContent = bound ? '綁定狀態：已綁定' : '綁定狀態：未綁定';
+        bindingStatus.textContent = bound ? t('綁定狀態：已綁定') : t('綁定狀態：未綁定');
     }
     const bindContainer = document.getElementById('google-bind-container');
     if (bindContainer) {
@@ -928,7 +904,7 @@ function showAuthView(viewName) {
 }
 
 function isUsernameTaken(username) {
-    if (['Dev','開發人員','Developer','Admin','開發團隊'].includes(username)) return true;
+    if (['Dev',t('開發人員'),'Developer','Admin',t('開發團隊')].includes(username)) return true;
     
     const accountsRaw = localStorage.getItem('survivor_accounts');
     const oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
@@ -959,12 +935,12 @@ function isEmailTaken(email) {
 
 function handleAccountRename() {
     const newName = (newUsernameInput ? newUsernameInput.value.trim() : '').slice(0, 20);
-    if (!currentUser || !newName) { alert('請輸入新的名稱'); return; }
+    if (!currentUser || !newName) { alert(t('請輸入新的名稱')); return; }
     const oldName = currentUser.username;
-    if (newName === oldName) { alert('名稱未變更'); return; }
+    if (newName === oldName) { alert(t('名稱未變更')); return; }
     
     if (isUsernameTaken(newName)) {
-        alert('此名稱已被使用');
+        alert(t('此名稱已被使用'));
         return;
     }
 
@@ -994,19 +970,19 @@ function handleAccountRename() {
     updateUserUI();
     if (accountSettingsModal) accountSettingsModal.classList.add('hidden');
     updateBindingUI();
-    alert(isCurrentUserBound() ? '名稱已更新（已綁定）' : '名稱已更新');
+    alert(isCurrentUserBound() ? t('名稱已更新（已綁定）') : t('名稱已更新'));
 }
 
 function handleBtnRegNext() {
     const email = regEmailInput ? regEmailInput.value.trim() : '';
     const password = regPasswordInput ? regPasswordInput.value.trim() : '';
     
-    if (!email) { alert('請輸入電子郵件'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('請輸入有效的電子郵件格式'); return; }
-    if (password.length < 6) { alert('密碼請設定至少 6 個字元'); return; }
+    if (!email) { alert(t('請輸入電子郵件')); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert(t('請輸入有效的電子郵件格式')); return; }
+    if (password.length < 6) { alert(t('密碼請設定至少 6 個字元')); return; }
     
     if (isEmailTaken(email)) {
-        alert('此信箱已經註冊過帳號，請直接登入或使用其他信箱。');
+        alert(t('此信箱已經註冊過帳號，請直接登入或使用其他信箱。'));
         return;
     }
     
@@ -1015,30 +991,12 @@ function handleBtnRegNext() {
     showAuthView('register-step2');
 }
 
-async function handleBtnRegSubmit() {
+function handleBtnRegSubmit() {
     const username = regUsernameInput ? regUsernameInput.value.trim() : '';
-    const email = tempRegData.email;
-    const password = tempRegData.password;
+    if (!username) { alert(t('請輸入指揮官代號')); return; }
     
-    if (!username) { alert('請輸入指揮官代號'); return; }
-    
-    // 優先使用 Firebase 註冊
-    if (typeof DataManager !== 'undefined' && DataManager.isFirebaseEnabled()) {
-        const result = await DataManager.register(email, password, username);
-        if (result.success) {
-            currentUser = result.user;
-            tempRegData = { email: '', password: '' };
-            completeLoginFlow();
-            return;
-        } else {
-            alert('註冊失敗：' + result.error);
-            return;
-        }
-    }
-    
-    // 舊版系統作為後備
     if (isUsernameTaken(username)) {
-        alert('此指揮官代號已被使用，請更換其他名稱。');
+        alert(t('此指揮官代號已被使用，請更換其他名稱。'));
         return;
     }
     
@@ -1058,8 +1016,6 @@ async function handleBtnRegSubmit() {
     v2Accounts[tempRegData.email] = { password: tempRegData.password, user: currentUser };
     localStorage.setItem('survivor_accounts_v2', JSON.stringify(v2Accounts));
     
-    backupAccountData();
-    
     tempRegData = { email: '', password: '' };
     
     saveUserSession();
@@ -1071,40 +1027,26 @@ async function handleBtnRegSubmit() {
     if (regPasswordInput) regPasswordInput.value = '';
     if (regUsernameInput) regUsernameInput.value = '';
     
-    alert(`註冊成功，${currentUser.username} 指揮官已建立帳號並登入！`);
+    alert(tf('註冊成功，{username} 指揮官已建立帳號並登入！', { username: currentUser.username }));
     renderLeaderboard(); 
     showTutorialIfNeeded();
 }
 
-async function handleBtnSubmitLogin() {
+function handleBtnSubmitLogin() {
     const emailOrOldId = loginEmailInput ? loginEmailInput.value.trim() : '';
     const password = loginPasswordInput ? loginPasswordInput.value.trim() : '';
     
     if (!emailOrOldId || !password) {
-        alert('請輸入登入資訊與密碼');
+        alert(t('請輸入登入資訊與密碼'));
         return;
     }
     
-    if (emailOrOldId === 'Dev' || emailOrOldId === '開發人員' || emailOrOldId === 'Developer' || emailOrOldId === 'Admin') {
-        currentUser = { username: '開發團隊', uid: 'DEV_001', isAdmin: true };
+    if (emailOrOldId === 'Dev' || emailOrOldId === t('開發人員') || emailOrOldId === 'Developer' || emailOrOldId === 'Admin') {
+        currentUser = { username: t('開發團隊'), uid: 'DEV_001', isAdmin: true };
         completeLoginFlow();
         return;
     }
     
-    // 優先使用 Firebase 登入
-    if (typeof DataManager !== 'undefined' && DataManager.isFirebaseEnabled()) {
-        const result = await DataManager.login(emailOrOldId, password);
-        if (result.success) {
-            currentUser = result.user;
-            completeLoginFlow();
-            return;
-        } else {
-            alert('登入失敗：' + result.error);
-            return;
-        }
-    }
-    
-    // 舊版系統作為後備
     const v2Raw = localStorage.getItem('survivor_accounts_v2');
     const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
     
@@ -1120,7 +1062,7 @@ async function handleBtnSubmitLogin() {
     
     if (oldAccounts[emailOrOldId]) {
         if (oldAccounts[emailOrOldId].password !== password) {
-            alert('密碼錯誤，請再試一次。');
+            alert(t('密碼錯誤，請再試一次。'));
             return;
         }
         tempMigrationData = { 
@@ -1132,7 +1074,7 @@ async function handleBtnSubmitLogin() {
         return;
     }
     
-    alert('找不到此帳號或信箱，請確認輸入是否有誤。');
+    alert(t('找不到此帳號或信箱，請確認輸入是否有誤。'));
 }
 
 function completeLoginFlow() {
@@ -1144,18 +1086,18 @@ function completeLoginFlow() {
     if (loginEmailInput) loginEmailInput.value = '';
     if (loginPasswordInput) loginPasswordInput.value = '';
     
-    alert(`登入成功，${currentUser.username} 指揮官已登入！`);
+    alert(tf('登入成功，{username} 指揮官已登入！', { username: currentUser.username }));
     renderLeaderboard(); 
     showTutorialIfNeeded();
 }
 
 function handleBtnSubmitMigration() {
     const bindEmail = migrateEmailInput ? migrateEmailInput.value.trim() : '';
-    if (!bindEmail) { alert('請輸入您的電子郵件'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bindEmail)) { alert('請輸入有效的電子郵件格式'); return; }
+    if (!bindEmail) { alert(t('請輸入您的電子郵件')); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bindEmail)) { alert(t('請輸入有效的電子郵件格式')); return; }
     
     if (isEmailTaken(bindEmail)) {
-        alert('此信箱已經綁定過帳號，無法重複綁定。');
+        alert(t('此信箱已經綁定過帳號，無法重複綁定。'));
         return;
     }
     
@@ -1175,9 +1117,6 @@ function handleBtnSubmitMigration() {
     delete oldAccounts[tempMigrationData.username];
     localStorage.setItem('survivor_accounts', JSON.stringify(oldAccounts));
     
-    // 遷移後立即備份
-    backupAccountData();
-    
     currentUser = tempMigrationData.userObj;
     tempMigrationData = { username: '', password: '', userObj: null };
     
@@ -1192,7 +1131,7 @@ function continueAsGuest() {
     updateUserUI();
     loginModal.classList.add('hidden');
     renderLeaderboard();
-    alert('已使用訪客身份繼續，目前進度將儲存在本機。');
+    alert(t('已使用訪客身份繼續，目前進度將儲存在本機。'));
 }
 
 function handleGoogleLogin(response) {
@@ -1224,15 +1163,11 @@ function handleGoogleLogin(response) {
                 email: googleUser.email,
                 picture: googleUser.picture
             };
-            
-            // Google 綁定後立即備份
-            backupAccountData();
-            
             saveUserSession();
             loadMetaProgress();
             updateUserUI();
             accountSettingsModal.classList.add('hidden');
-            alert('Google 帳號綁定成功');
+            alert(t('Google 帳號綁定成功'));
             return;
         }
         
@@ -1277,11 +1212,6 @@ function handleGoogleLogin(response) {
                 email: googleUser.email,
                 picture: googleUser.picture
             };
-            
-            // 新建立 Google 帳號後立即備份
-            bindings[seed] = { username: currentUser.username, uid: currentUser.uid };
-            localStorage.setItem('survivor_google_bindings', JSON.stringify(bindings));
-            backupAccountData();
         }
 
         saveUserSession();
@@ -1289,19 +1219,19 @@ function handleGoogleLogin(response) {
         updateUserUI();
         loginModal.classList.add('hidden');
         
-        alert(`Google 登入成功！歡迎回來，${currentUser.username} 指揮官。`);
+        alert(tf('Google 登入成功！歡迎回來，{username} 指揮官。', { username: currentUser.username }));
         renderLeaderboard();
         showTutorialIfNeeded();
     } catch (err) {
-        console.error("Google 登入解析失敗:", err);
-        alert("Google 登入失敗，請稍後再試。");
+        console.error(t('Google 登入解析失敗:'), err);
+        alert(t('Google 登入失敗，請稍後再試。'));
     }
 }
 
 // 初始化 Google 登入
 function initGoogleLogin() {
     if (typeof google === 'undefined') {
-        console.warn("Google SDK 尚未載入，稍後重試...");
+        console.warn(t('Google SDK 尚未載入，稍後重試...'));
         setTimeout(initGoogleLogin, 1000);
         return;
     }
@@ -1343,7 +1273,7 @@ function initGoogleLogin() {
 function handleFeedbackSubmit() {
     const content = feedbackContentInput.value.trim();
     if (!content) {
-        alert('請輸入您的意見反饋內容。');
+        alert(t('請輸入您的意見反饋內容。'));
         return;
     }
 
@@ -1352,7 +1282,7 @@ function handleFeedbackSubmit() {
     let feedbacks = feedbacksRaw ? JSON.parse(feedbacksRaw) : [];
     
     feedbacks.push({
-        user: currentUser ? currentUser.username : '訪客',
+        user: currentUser ? currentUser.username : t('訪客'),
         uid: currentUser ? currentUser.uid : 'GUEST',
         content: content,
         time: new Date().toLocaleString()
@@ -1362,7 +1292,7 @@ function handleFeedbackSubmit() {
     
     feedbackContentInput.value = '';
     feedbackModal.classList.add('hidden');
-    alert('感謝您的意見反饋！我們已收到您的寶貴建議。');
+    alert(t('感謝您的意見反饋！我們已收到您的寶貴建議。'));
 }
 
 function renderAdminFeedbacks() {
@@ -1373,7 +1303,7 @@ function renderAdminFeedbacks() {
     adminFeedbackList.innerHTML = '';
     
     if (feedbacks.length === 0) {
-        adminFeedbackList.innerHTML = '<div style="text-align:center; padding: 20px; color: rgba(255,255,255,0.4);">目前尚無任何反饋紀錄。</div>';
+        adminFeedbackList.innerHTML = '<div style="text-align:center; padding: 20px; color: rgba(255,255,255,0.4);">' + t('目前尚無任何反饋紀錄。') + '</div>';
         return;
     }
 
@@ -1451,7 +1381,7 @@ function renderAdminData() {
     }
     
     if (allPlayers.length === 0) {
-        adminDataList.innerHTML = '<div style="text-align:center; padding: 20px; color: rgba(255,255,255,0.4);">尚無任何指揮官數據。</div>';
+        adminDataList.innerHTML = '<div style="text-align:center; padding: 20px; color: rgba(255,255,255,0.4);">' + t('尚無任何指揮官數據。') + '</div>';
         return;
     }
 
@@ -1477,13 +1407,13 @@ function handleAccountDeletion() {
     
     const usernameToDelete = currentUser.username;
     const confirmMsg = currentUser.isAdmin 
-        ? '身為開發人員，確定要註銷目前帳號並清空所有本機數據嗎？' 
-        : '確定要註銷帳號嗎？這將刪除所有軍資與戰績紀錄，且無法恢復！';
+        ? t('身為開發人員，確定要註銷目前帳號並清空所有本機數據嗎？') 
+        : t('確定要註銷帳號嗎？這將刪除所有軍資與戰績紀錄，且無法恢復！');
         
     if (confirm(confirmMsg)) {
         if (currentUser.isAdmin) {
             localStorage.clear(); // Admin clears everything
-            alert('所有系統數據已格式化完成。');
+            alert(t('所有系統數據已格式化完成。'));
         } else {
             // Remove user entries from leaderboard
             let list = loadLeaderboard();
@@ -1496,7 +1426,7 @@ function handleAccountDeletion() {
             localStorage.removeItem(`survivor_funds${prefix}`);
             localStorage.removeItem(`survivor_units_owned${prefix}`);
             localStorage.removeItem(`survivor_units_equipped${prefix}`);
-            alert('帳號與相關戰績已成功註銷。');
+            alert(t('帳號與相關戰績已成功註銷。'));
         }
         window.location.reload();
     }
@@ -1504,15 +1434,15 @@ function handleAccountDeletion() {
 
 function handleAdminClearData() {
     if (!currentUser || !currentUser.isAdmin) return;
-    if (confirm('⚠️ 警告：這將刪除包括排行榜、所有使用者紀錄、軍資在內的所有數據！確定執行格式化嗎？')) {
+    if (confirm(t('⚠️ 警告：這將刪除包括排行榜、所有使用者紀錄、軍資在內的所有數據！確定執行格式化嗎？'))) {
         localStorage.clear();
-        alert('數據已全數清空。');
+        alert(t('數據已全數清空。'));
         window.location.reload();
     }
 }
 
 function handleLogout() {
-    if (confirm('確定要登出嗎？')) {
+    if (confirm(t('確定要登出嗎？'))) {
         currentUser = null;
         saveUserSession();
         
@@ -1521,7 +1451,7 @@ function handleLogout() {
         
         updateUserUI();
         renderLeaderboard();
-        alert('已成功登出，目前已切換為訪客模式。');
+        alert(t('已成功登出，目前已切換為訪客模式。'));
     }
 }
 
@@ -1550,7 +1480,7 @@ function updateUserUI() {
             adminViewDataBtn.classList.add('hidden');
         }
     } else {
-        displayUserName.textContent = '訪客';
+        displayUserName.textContent = t('訪客');
         displayUid.textContent = 'UID: GUEST_0000';
         loginTriggerBtn.classList.remove('hidden');
         logoutBtn.classList.add('hidden');
@@ -1561,7 +1491,7 @@ function updateUserUI() {
         
         // 訪客也應顯示其最高紀錄
         const list = loadLeaderboard();
-        const guestBest = list.filter(e => e.name === '訪客').sort((a, b) => b.score - a.score)[0];
+        const guestBest = list.filter(e => e.name === t('訪客')).sort((a, b) => b.score - a.score)[0];
         if (highestScoreDisplay) {
             highestScoreDisplay.textContent = guestBest ? guestBest.score.toLocaleString() : '0';
         }
@@ -1574,21 +1504,15 @@ function updateFundsUI() {
     }
 }
 
-async function renderLeaderboard() {
-    // 優先使用 DataManager 取得排行榜
-    let list;
-    if (typeof DataManager !== 'undefined') {
-        list = await DataManager.getLeaderboard();
-    } else {
-        list = loadLeaderboard();
-    }
+function renderLeaderboard() {
+    const list = loadLeaderboard();
     
     // 1. Render for modal
     if (leaderboardList) {
         leaderboardList.innerHTML = '';
         if (!list.length) {
             const empty = document.createElement('div');
-            empty.textContent = '目前尚無紀錄，先打出你的第一場戰績吧！';
+            empty.textContent = t('目前尚無紀錄，先打出你的第一場戰績吧！');
             leaderboardList.appendChild(empty);
         } else {
             list.forEach((entry, index) => {
@@ -1613,7 +1537,7 @@ async function renderLeaderboard() {
             empty.style.fontSize = '12px';
             empty.style.textAlign = 'center';
             empty.style.padding = '20px';
-            empty.textContent = '暫無戰績紀錄';
+            empty.textContent = t('暫無戰績紀錄');
             leaderboardListPanel.appendChild(empty);
         } else {
             list.forEach((entry, index) => {
@@ -1646,15 +1570,9 @@ function saveLeaderboard(list) {
     localStorage.setItem('survivor_leaderboard', JSON.stringify(list));
 }
 
-async function recordScoreToLeaderboard(finalScore) {
+function recordScoreToLeaderboard(finalScore) {
     if (!finalScore || finalScore <= 0) return;
-    
-    // 優先使用 DataManager 提交分數
-    if (typeof DataManager !== 'undefined') {
-        await DataManager.submitScore(finalScore);
-    }
-    
-    const name = currentUser && currentUser.username ? currentUser.username : '訪客';
+    const name = currentUser && currentUser.username ? currentUser.username : t('訪客');
     const list = loadLeaderboard();
     list.push({ name, score: finalScore, time: Date.now() });
     list.sort((a, b) => {
@@ -1670,7 +1588,7 @@ function loadMetaProgress() {
     const prefix = currentUser ? `_${currentUser.username}` : '';
     
     // Dev account special case
-    if (currentUser && currentUser.username === '開發團隊') {
+    if (currentUser && currentUser.username === t('開發團隊')) {
         militaryFunds = 9999999;
         ownedUnits = {};
         equippedUnits = {};
@@ -1836,19 +1754,7 @@ function menuBgLoop(timestamp) {
     menuBgAnimationId = requestAnimationFrame(menuBgLoop);
 }
 
-async function saveMetaProgress() {
-    const data = {
-        funds: militaryFunds,
-        unitsOwned: ownedUnits,
-        unitsEquipped: equippedUnits
-    };
-    
-    // 優先使用 DataManager 存到雲端
-    if (typeof DataManager !== 'undefined') {
-        await DataManager.saveProgress(data);
-    }
-    
-    // 同時也存到本地當備份
+function saveMetaProgress() {
     const prefix = currentUser ? `_${currentUser.username}` : '';
     localStorage.setItem(`survivor_funds${prefix}`, String(militaryFunds));
     localStorage.setItem(`survivor_units_owned${prefix}`, JSON.stringify(ownedUnits));
@@ -1881,8 +1787,8 @@ function renderUnitShop() {
         const card = document.createElement('div');
         const owned = !!ownedUnits[unit.id];
         const equipped = !!equippedUnits[unit.id];
-        const statusText = owned ? (equipped ? '已購買・裝備中' : '已購買') : `價格：${unit.cost.toLocaleString()} 軍資`;
-        const actionLabel = owned ? (equipped ? '卸下' : '裝備') : '購買';
+        const statusText = owned ? (equipped ? t('已購買・裝備中') : t('已購買')) : tf('價格：{cost} 軍資', { cost: unit.cost.toLocaleString() });
+        const actionLabel = owned ? (equipped ? t('卸下') : t('裝備')) : t('購買');
         card.className = 'unit-card';
         if (owned) {
             card.classList.add('unit-card-owned');
@@ -1919,7 +1825,7 @@ function handlePurchaseUnit(id) {
     const unit = unitDefinitions[id];
     if (!unit) return;
     if (militaryFunds < unit.cost) {
-        alert('軍資不足，無法購買此單位。');
+        alert(t('軍資不足，無法購買此單位。'));
         return;
     }
     militaryFunds -= unit.cost;
@@ -1937,134 +1843,28 @@ function toggleEquipUnit(id) {
     renderUnitShop();
 }
 
-// 檢查帳號是否真實存在於註冊列表中
-function isAccountValid(userObj) {
-    if (!userObj || !userObj.username) return false;
-    
-    // 檢查 V1 帳號
-    const accountsRaw = localStorage.getItem('survivor_accounts');
-    const oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
-    if (oldAccounts[userObj.username]) return true;
-    
-    // 檢查 V2 帳號
-    const v2Raw = localStorage.getItem('survivor_accounts_v2');
-    const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
-    for (const email in v2Accounts) {
-        if (v2Accounts[email] && v2Accounts[email].user && v2Accounts[email].user.username === userObj.username) {
-            return true;
-        }
-    }
-    
-    // 檢查 Google 綁定
-    const bindingsRaw = localStorage.getItem('survivor_google_bindings');
-    const bindings = bindingsRaw ? JSON.parse(bindingsRaw) : {};
-    for (const key in bindings) {
-        if (bindings[key] && bindings[key].username === userObj.username) {
-            return true;
-        }
-    }
-    
-    return false;
-}
-
-// 帳號備份機制：自動將重要帳號資料備份到多個 key
-function backupAccountData() {
-    try {
-        // 備份 V2 帳號
-        const v2Raw = localStorage.getItem('survivor_accounts_v2');
-        if (v2Raw) {
-            localStorage.setItem('survivor_accounts_v2_backup', v2Raw);
-        }
-        
-        // 備份 V1 帳號
-        const accRaw = localStorage.getItem('survivor_accounts');
-        if (accRaw) {
-            localStorage.setItem('survivor_accounts_backup', accRaw);
-        }
-        
-        // 備份 Google 綁定
-        const bindRaw = localStorage.getItem('survivor_google_bindings');
-        if (bindRaw) {
-            localStorage.setItem('survivor_google_bindings_backup', bindRaw);
-        }
-        
-        console.log("帳號資料備份完成。");
-    } catch (e) {
-        console.warn("帳號備份失敗:", e);
-    }
-}
-
-// 從備份中恢復帳號資料（如果主要資料損壞）
-function restoreAccountData() {
-    try {
-        // 檢查主要 V2 帳號是否遺失
-        const v2Raw = localStorage.getItem('survivor_accounts_v2');
-        if (!v2Raw || v2Raw === '{}') {
-            const backup = localStorage.getItem('survivor_accounts_v2_backup');
-            if (backup) {
-                localStorage.setItem('survivor_accounts_v2', backup);
-                console.log("已從備份恢復 V2 帳號資料。");
-            }
-        }
-        
-        // 檢查主要 V1 帳號是否遺失
-        const accRaw = localStorage.getItem('survivor_accounts');
-        if (!accRaw || accRaw === '{}') {
-            const backup = localStorage.getItem('survivor_accounts_backup');
-            if (backup) {
-                localStorage.setItem('survivor_accounts', backup);
-                console.log("已從備份恢復 V1 帳號資料。");
-            }
-        }
-        
-        // 檢查 Google 綁定是否遺失
-        const bindRaw = localStorage.getItem('survivor_google_bindings');
-        if (!bindRaw || bindRaw === '{}') {
-            const backup = localStorage.getItem('survivor_google_bindings_backup');
-            if (backup) {
-                localStorage.setItem('survivor_google_bindings', backup);
-                console.log("已從備份恢復 Google 綁定資料。");
-            }
-        }
-    } catch (e) {
-        console.warn("恢復帳號備份失敗:", e);
-    }
-}
-
 // Check for saved user on load
 function checkSavedUser() {
-    console.log("正在檢查儲存的登入狀態...");
-    
-    // 先嚐試從備份恢復資料
-    restoreAccountData();
-    
+    console.log(t('正在檢查儲存的登入狀態...'));
     try {
         const saved = localStorage.getItem('survivor_user');
         if (saved && saved !== 'null' && saved !== 'undefined') {
             const parsed = JSON.parse(saved);
             if (parsed && parsed.username) {
-                // 驗證帳號是否真實存在
-                if (isAccountValid(parsed)) {
-                    currentUser = parsed;
-                    console.log("已恢復登入狀態:", currentUser.username);
-                    loadMetaProgress(); 
-                } else {
-                    console.warn("偵測到損毀的登入狀態，已自動登出。");
-                    currentUser = null;
-                    localStorage.removeItem('survivor_user');
-                    loadMetaProgress();
-                }
+                currentUser = parsed;
+                console.log(t('已恢復登入狀態:'), currentUser.username);
+                loadMetaProgress(); 
             } else {
                 currentUser = null;
                 loadMetaProgress();
             }
         } else {
-            console.log("未發現儲存的登入狀態，以訪客身份執行。");
+            console.log(t('未發現儲存的登入狀態，以訪客身份執行。'));
             currentUser = null;
             loadMetaProgress(); 
         }
     } catch (e) {
-        console.error("解析儲存的用戶資料失敗:", e);
+        console.error(t('解析儲存的用戶資料失敗:'), e);
         localStorage.removeItem('survivor_user');
         currentUser = null;
         loadMetaProgress();
@@ -2078,7 +1878,7 @@ renderLeaderboard(); // 初始渲染排行榜面板
 
 // Hourly leaderboard refresh
 setInterval(() => {
-    console.log('自動刷新排行榜...');
+    console.log(t('自動刷新排行榜...'));
     renderLeaderboard();
 }, 3600000); 
 
@@ -2107,13 +1907,74 @@ setInterval(() => {
     }
     if (createRoomBtn) {
         createRoomBtn.onclick = () => {
-            const roomName = prompt('請輸入房間名稱:', '戰區 ' + Math.floor(Math.random() * 100));
+            const createModal = document.getElementById('create-room-modal');
+            if (createModal) {
+                const nameInput = document.getElementById('cr-room-name');
+                const maxInput = document.getElementById('cr-max-players');
+                const diffInput = document.getElementById('cr-difficulty');
+                const modeRadios = document.querySelectorAll('input[name="cr-game-mode"]');
+                if (nameInput) nameInput.value = t('戰區 ') + Math.floor(Math.random() * 100);
+                if (maxInput) maxInput.value = 4;
+                if (diffInput) diffInput.value = 1;
+                if (modeRadios && modeRadios[0]) modeRadios[0].checked = true;
+                createModal.classList.remove('hidden');
+                return;
+            }
+            const roomName = prompt(t('請輸入房間名稱:'), t('戰區 ') + Math.floor(Math.random() * 100));
             if (!roomName) return;
-            const maxPlayersInput = prompt('設定房間最大人數 (2 ~ 8):', '4');
+            const modePrompt = prompt(t('選擇遊戲模式: 1=生存(♾️), 2=波次(🌊), 3=BOSS(👹)'), '1');
+            const modeMap = { '1': 'survival', '2': 'wave', '3': 'boss' };
+            const gameMode = modeMap[modePrompt || '1'] || 'survival';
+            const maxPlayersInput = prompt(t('設定房間最大人數 (2 ~ 8):'), '4');
             const maxPlayers = Math.min(8, Math.max(2, parseInt(maxPlayersInput || '4', 10) || 4));
-            const diffInput = prompt('設定房間難度倍率 (1 = 標準，建議 0.5 ~ 3):', '1');
+            const diffInput = prompt(t('設定房間難度倍率 (1 = 標準，建議 0.5 ~ 3):'), '1');
             const difficulty = Math.max(0.2, Math.min(5, parseFloat(diffInput || '1') || 1));
-            multiplayer.joinRoom(roomName, true, maxPlayers, difficulty);
+            multiplayer.joinRoom(roomName, true, maxPlayers, difficulty, gameMode);
+        };
+    }
+    const crCancelBtn = document.getElementById('cr-cancel-btn');
+    const crConfirmBtn = document.getElementById('cr-confirm-btn');
+    if (crCancelBtn) {
+        crCancelBtn.onclick = () => {
+            const m = document.getElementById('create-room-modal');
+            if (m) m.classList.add('hidden');
+        };
+    }
+    if (crConfirmBtn) {
+        crConfirmBtn.onclick = () => {
+            const nameInput = document.getElementById('cr-room-name');
+            const maxInput = document.getElementById('cr-max-players');
+            const diffInput = document.getElementById('cr-difficulty');
+            const modeRadios = document.querySelectorAll('input[name="cr-game-mode"]:checked');
+            const roomName = nameInput ? (nameInput.value || '').trim() : '';
+            if (!roomName) { alert(t('請輸入房間名稱')); return; }
+            const gameMode = modeRadios && modeRadios[0] ? modeRadios[0].value : 'survival';
+            const maxPlayers = Math.min(8, Math.max(2, parseInt(maxInput ? (maxInput.value || '4') : '4', 10) || 4));
+            const difficulty = Math.max(0.2, Math.min(5, parseFloat(diffInput ? (diffInput.value || '1') : '1') || 1));
+            const m = document.getElementById('create-room-modal');
+            if (m) m.classList.add('hidden');
+            multiplayer.joinRoom(roomName, true, maxPlayers, difficulty, gameMode);
+        };
+    }
+    const mpResultReplayBtn = document.getElementById('mp-result-replay');
+    const mpResultMenuBtn = document.getElementById('mp-result-menu');
+    if (mpResultReplayBtn) {
+        mpResultReplayBtn.onclick = () => {
+            const resultScreen = document.getElementById('multiplayer-result-screen');
+            if (resultScreen) resultScreen.classList.add('hidden');
+            if (multiplayer.currentRoomId) {
+                multiplayer.joinRoom(multiplayer.currentRoomId, false);
+                startMultiplayer();
+            } else {
+                if (lobbyModal) lobbyModal.classList.remove('hidden');
+            }
+        };
+    }
+    if (mpResultMenuBtn) {
+        mpResultMenuBtn.onclick = () => {
+            const resultScreen = document.getElementById('multiplayer-result-screen');
+            if (resultScreen) resultScreen.classList.add('hidden');
+            showMainMenu();
         };
     }
     if (refreshLobbyBtn) {
@@ -2180,7 +2041,7 @@ setInterval(() => {
     }
     if (clearFeedbacksBtn) {
         clearFeedbacksBtn.onclick = () => {
-            if (confirm('確定要清空所有收集到的意見反饋嗎？此操作不可恢復。')) {
+            if (confirm(t('確定要清空所有收集到的意見反饋嗎？此操作不可恢復。'))) {
                 localStorage.removeItem('survivor_feedbacks');
                 renderAdminFeedbacks();
             }
@@ -2204,7 +2065,7 @@ setInterval(() => {
     if (replayTutorialBtn) {
         replayTutorialBtn.onclick = () => {
             if (!currentUser) {
-                alert('請先登入帳號後再重新觀看新手教學。');
+                alert(t('請先登入帳號後再重新觀看新手教學。'));
                 return;
             }
             resetTutorial();
@@ -2240,90 +2101,194 @@ class MultiplayerManager {
     constructor() {
         this.socket = null;
         this.playerId = null;
+        this.roomId = null;
+        this.gameMode = 'survival';
+        this.wave = 0;
+        this.totalKills = 0;
+        
         this.players = new Map();
         this.enemies = [];
         this.bullets = [];
         this.xpOrbs = [];
         this.moneyDrops = [];
         this.healthPacks = [];
+        this.airStrikes = [];
+        
         this.active = false;
+        this.alive = true;
+        this.respawnAt = 0;
+        
         this.lastInputSent = 0;
         this.localX = 0;
         this.localY = 0;
+        
+        this.score = 0;
+        this.kills = 0;
+        this.level = 1;
+        this.upgrades = { multishot: 0, fireRate: 0, damage: 0, speed: 0, hp: 0 };
+        
+        this.airSupportReady = true;
+        this.airSupportCooldownEnd = 0;
+        this.airSupportTargeting = false;
+        
+        this.pendingLevelUp = null;
+        this.isPaused = false;
+        
+        this.otherPlayersSmooth = new Map();
+        this.gameEnded = false;
     }
 
     disconnect() {
         if (this.socket) {
+            try {
+                if (this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(JSON.stringify({ type: 'leave_room' }));
+                }
+            } catch (e) {}
             this.socket.close();
             this.socket = null;
         }
         this.active = false;
+        this.alive = true;
         this.players.clear();
         this.enemies = [];
         this.bullets = [];
         this.xpOrbs = [];
         this.moneyDrops = [];
         this.healthPacks = [];
+        this.airStrikes = [];
+        this.otherPlayersSmooth.clear();
+        this.pendingLevelUp = null;
+        this.gameEnded = false;
+        this.score = 0;
+        this.kills = 0;
+        this.level = 1;
+        this.upgrades = { multishot: 0, fireRate: 0, damage: 0, speed: 0, hp: 0 };
+        
         if (this.refreshInterval) clearInterval(this.refreshInterval);
+        if (tacticalSkillOverlay) tacticalSkillOverlay.classList.add('hidden');
+        if (airRaidWarning) airRaidWarning.classList.add('hidden');
     }
 
     connect() {
         if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) return;
         
         try {
-            // 使用明確的 IP 位址，有助於解決某些環境下的連線問題
             const qs = new URLSearchParams(location.search);
             const override = qs.get('ws');
             const target = override ? override : ((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
             this.socket = new WebSocket(target);
             
             this.socket.onopen = () => {
-                console.log('Connected to multiplayer server');
+                console.log('[Multiplayer v2.0] Connected to tactical server');
                 this.onConnected();
             };
 
             this.socket.onmessage = (event) => {
                 const msg = JSON.parse(event.data);
-                if (msg.type === 'joined') {
-                    this.playerId = msg.playerId;
-                    this.active = true;
-                    // Start at server spawn (0,0)
-                    this.localX = 0;
-                    this.localY = 0;
-                    // Force camera to jump to player immediately
-                    camera.x = this.localX - canvas.width / 2;
-                    camera.y = this.localY - canvas.height / 2;
-                    
-                    lobbyModal.classList.add('hidden');
-                    startMultiplayer();
-                } else if (msg.type === 'state') {
-                    this.updateState(msg);
-                } else if (msg.type === 'pickup') {
-                    if (msg.item === 'xp') playSound('pickup');
-                    else if (msg.item === 'health') playSound('heal');
-                } else if (msg.type === 'notification') {
-                    // 顯示伺服器系統通知
-                    showNotification(msg.message);
-                } else if (msg.type === 'room_list') {
-                    this.renderRoomList(msg.rooms);
-                } else if (msg.type === 'game_over') {
-                    endGame();
-                } else if (msg.type === 'error') {
-                    alert('錯誤: ' + msg.message);
-                }
+                this.handleMessage(msg);
             };
 
             this.socket.onclose = () => {
                 this.active = false;
-                console.log('Disconnected from multiplayer server');
+                console.log('[Multiplayer] Disconnected');
+                if (gameRunning && !this.gameEnded) {
+                    showNotification(t('⚠️ 與伺服器連線中斷'));
+                }
             };
 
             this.socket.onerror = () => {
-                alert('連線伺服器失敗！請確認 server.js 是否已啟動。');
+                alert(t('連線伺服器失敗！請確認多人伺服器是否已啟動。'));
                 this.active = false;
             };
         } catch (e) {
-            console.error('Multiplayer connection error:', e);
+            console.error('[Multiplayer] Connection error:', e);
+        }
+    }
+    
+    handleMessage(msg) {
+        switch (msg.type) {
+            case 'joined':
+                this.playerId = msg.playerId;
+                this.roomId = msg.roomId;
+                this.gameMode = msg.gameMode || 'survival';
+                this.wave = msg.wave || 0;
+                this.active = true;
+                this.gameEnded = false;
+                this.alive = true;
+                this.localX = 0;
+                this.localY = 0;
+                this.score = 0;
+                this.kills = 0;
+                this.level = 1;
+                this.upgrades = { multishot: 0, fireRate: 0, damage: 0, speed: 0, hp: 0 };
+                this.airSupportReady = true;
+                this.airSupportCooldownEnd = 0;
+                camera.x = this.localX - canvas.width / 2;
+                camera.y = this.localY - canvas.height / 2;
+                
+                lobbyModal.classList.add('hidden');
+                startMultiplayer();
+                break;
+                
+            case 'state':
+                this.updateState(msg);
+                break;
+                
+            case 'level_up':
+                this.handleLevelUp(msg);
+                break;
+                
+            case 'upgrade_applied':
+                this.upgrades[msg.upgradeType] = (this.upgrades[msg.upgradeType] || 0) + 1;
+                playSound('levelup');
+                break;
+                
+            case 'air_support_ready':
+                this.airSupportReady = true;
+                showNotification(t('✈️ 空中支援已就緒'));
+                break;
+                
+            case 'airstrike_incoming':
+                this.handleAirstrikeIncoming(msg);
+                break;
+                
+            case 'airstrike_explode':
+                this.handleAirstrikeExplode(msg);
+                break;
+                
+            case 'player_death':
+                this.handlePlayerDeath(msg);
+                break;
+                
+            case 'player_respawn':
+                this.handlePlayerRespawn(msg);
+                break;
+                
+            case 'pickup':
+                if (msg.item === 'xp') playSound('xp');
+                else if (msg.item === 'health') playSound('hit');
+                break;
+                
+            case 'notification':
+                showNotification(msg.key ? tf(msg.key, msg.vars) : msg.message);
+                break;
+                
+            case 'room_list':
+                this.renderRoomList(msg.rooms);
+                break;
+                
+            case 'game_end':
+                this.handleGameEnd(msg);
+                break;
+                
+            case 'game_over':
+                endGame();
+                break;
+                
+            case 'error':
+                alert(t('⚠️ 錯誤: ') + (msg.key ? tf(msg.key, msg.vars) : msg.message));
+                break;
         }
     }
 
@@ -2335,7 +2300,6 @@ class MultiplayerManager {
 
     onConnected() {
         this.requestRoomList();
-        // Auto-refresh room list every 5 seconds if lobby is open
         if (this.refreshInterval) clearInterval(this.refreshInterval);
         this.refreshInterval = setInterval(() => {
             if (!lobbyModal.classList.contains('hidden')) {
@@ -2344,17 +2308,20 @@ class MultiplayerManager {
         }, 5000);
     }
 
-    joinRoom(roomId, create = false, maxPlayers, difficulty) {
+    joinRoom(roomId, create = false, maxPlayers, difficulty, gameMode) {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            const units = equippedUnits || {};
             const payload = {
                 type: 'join',
                 roomId,
                 create,
-                name: currentUser ? currentUser.username : '訪客'
+                name: currentUser ? currentUser.username : t('訪客'),
+                units: units
             };
             if (create) {
                 payload.maxPlayers = maxPlayers;
                 payload.difficulty = difficulty;
+                payload.gameMode = gameMode || 'survival';
             }
             this.socket.send(JSON.stringify(payload));
         }
@@ -2364,75 +2331,328 @@ class MultiplayerManager {
         if (!roomListContainer) return;
         roomListContainer.innerHTML = '';
         
+        if (rooms.length === 0) {
+            roomListContainer.innerHTML = '<div style="text-align:center; padding:30px; color:rgba(255,255,255,0.4);">' + t('目前沒有進行中的房間，點擊「建立新房間」開始！') + '</div>';
+            return;
+        }
+        
+        const modes = SharedConfig.MULTIPLAYER.GAME_MODES;
+        
         rooms.forEach(room => {
             const isFull = room.playerCount >= room.maxPlayers;
+            const modeCfg = modes[room.gameMode] || modes.survival;
             const item = document.createElement('div');
             item.className = 'room-item';
+            
+            let waveInfo = '';
+            if (room.gameMode === 'wave' && room.wave > 0) {
+                waveInfo = tf(' · 第{wave}波', { wave: room.wave });
+            }
+            
             item.innerHTML = `
-                <div class="room-name">${room.id}</div>
+                <div class="room-name">
+                    <span style="font-size:16px;">${modeCfg.icon}</span>
+                    <span style="margin-left:6px;">${room.id}</span>
+                    <div style="font-size:10px; color:#888; margin-top:2px;">${modeCfg.name}${waveInfo}</div>
+                </div>
                 <div class="room-players">${room.playerCount} / ${room.maxPlayers}</div>
                 <div class="room-status ${isFull ? 'status-full' : 'status-waiting'}">
-                    ${isFull ? '已滿' : '等待中'}
+                    ${isFull ? t('已滿') : t('等待中')}
                 </div>
                 <div class="room-action">
-                    <button class="small-btn join-btn" ${isFull ? 'disabled' : ''}>加入</button>
+                    <button class="small-btn join-btn ${isFull ? '' : 'endless-btn'}" ${isFull ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
+                        ${isFull ? t('已滿') : t('加入')}
+                    </button>
                 </div>
             `;
             
             const joinBtn = item.querySelector('.join-btn');
-            joinBtn.onclick = () => this.joinRoom(room.id);
+            if (!isFull) {
+                joinBtn.onclick = () => this.joinRoom(room.id);
+            }
             roomListContainer.appendChild(item);
         });
     }
 
     updateState(state) {
+        this.gameMode = state.gameMode || this.gameMode;
+        this.wave = state.wave || 0;
+        this.totalKills = state.totalKills || 0;
+        
         const currentIds = new Set();
+        let localPlayerData = null;
+        
         state.players.forEach(p => {
             currentIds.add(p.id);
-            this.players.set(p.id, p);
             
-            // 強化平滑同步邏輯 (Soft Reconciliation)
             if (p.id === this.playerId) {
-                // 受傷音效觸發 (優化 UI 數值抓取邏輯)
-                const currentHpText = hpDisplay ? hpDisplay.textContent : '100';
-                const oldHp = parseFloat(currentHpText) || 100;
-                if (p.hp < oldHp - 1) playSound('hit');
-
-                // 同步 UI 狀態 (多人模式專屬 UI 同步)
-                if (hpDisplay) hpDisplay.textContent = Math.ceil(p.hp);
-                if (levelDisplay) levelDisplay.textContent = p.level;
-                if (xpBarFill) {
-                    const ratio = p.xpToNextLevel > 0 ? (p.xp / p.xpToNextLevel) : 0;
-                    xpBarFill.style.width = `${ratio * 100}%`;
-                }
-
-                const dist = Math.hypot(this.localX - p.x, this.localY - p.y);
-                if (dist > 100) { // 差距過大才進行瞬移校正
-                    this.localX = p.x;
-                    this.localY = p.y;
-                } else if (dist > 50) { // 放寬本地端預測差異的容忍度，避免因伺服器延遲導致的拉扯感
-                    this.localX += (p.x - this.localX) * 0.1;
-                    this.localY += (p.y - this.localY) * 0.1;
-                }
+                localPlayerData = p;
+            } else {
+                const smooth = this.otherPlayersSmooth.get(p.id) || { x: p.x, y: p.y };
+                smooth.x += (p.x - smooth.x) * 0.2;
+                smooth.y += (p.y - smooth.y) * 0.2;
+                this.otherPlayersSmooth.set(p.id, smooth);
             }
+            
+            this.players.set(p.id, p);
         });
         
         for (let id of this.players.keys()) {
-            if (!currentIds.has(id)) this.players.delete(id);
+            if (!currentIds.has(id)) {
+                this.players.delete(id);
+                this.otherPlayersSmooth.delete(id);
+                if (this.playerAnims) this.playerAnims.delete(id);
+            }
+        }
+        
+        if (localPlayerData) {
+            const wasAlive = this.alive;
+            this.alive = localPlayerData.alive;
+            this.respawnAt = localPlayerData.respawnAt || 0;
+            this.score = localPlayerData.score || 0;
+            this.kills = localPlayerData.kills || 0;
+            this.level = localPlayerData.level;
+            this.airSupportReady = localPlayerData.airSupportReady;
+            this.airSupportCooldownEnd = localPlayerData.airSupportCooldownEnd || 0;
+            
+            const currentHpText = hpDisplay ? hpDisplay.textContent : '100';
+            const oldHp = parseFloat(currentHpText) || 100;
+            if (localPlayerData.hp < oldHp - 1 && this.alive) playSound('hit');
+            
+            if (hpDisplay) hpDisplay.textContent = Math.ceil(Math.max(0, localPlayerData.hp));
+            if (levelDisplay) levelDisplay.textContent = localPlayerData.level;
+            if (scoreDisplay) scoreDisplay.textContent = this.score;
+            if (xpBarFill) {
+                const ratio = localPlayerData.xpToNextLevel > 0 ? (localPlayerData.xp / localPlayerData.xpToNextLevel) : 0;
+                xpBarFill.style.width = `${Math.min(100, ratio * 100)}%`;
+            }
+            
+            if (this.alive) {
+                const dist = Math.hypot(this.localX - localPlayerData.x, this.localY - localPlayerData.y);
+                if (dist > 150) {
+                    this.localX = localPlayerData.x;
+                    this.localY = localPlayerData.y;
+                } else if (dist > 60) {
+                    this.localX += (localPlayerData.x - this.localX) * 0.15;
+                    this.localY += (localPlayerData.y - this.localY) * 0.15;
+                }
+            }
+            
+            this.updateAirSupportUI();
         }
 
         this.enemies = state.enemies || [];
         this.bullets = state.bullets || [];
         this.xpOrbs = state.xpOrbs || [];
-        this.moneyDrops = state.moneyDrops || [];
         this.healthPacks = state.healthPacks || [];
+        this.airStrikes = state.airStrikes || [];
+    }
+    
+    updateAirSupportUI() {
+        if (!airSupportFillNew || !skillStatusText) return;
+        
+        const now = Date.now();
+        const cdTotal = SharedConfig.MULTIPLAYER.AIR_SUPPORT_COOLDOWN;
+        
+        if (this.airSupportReady) {
+            airSupportFillNew.style.width = '100%';
+            skillStatusText.textContent = 'READY';
+            skillStatusText.classList.add('active');
+        } else {
+            const remaining = Math.max(0, this.airSupportCooldownEnd - now);
+            const pct = Math.max(0, 100 - (remaining / cdTotal * 100));
+            airSupportFillNew.style.width = `${pct}%`;
+            skillStatusText.textContent = `${(remaining/1000).toFixed(1)}s`;
+            skillStatusText.classList.remove('active');
+        }
+    }
+    
+    handleLevelUp(msg) {
+        playSound('levelup');
+        
+        if (hpDisplay) hpDisplay.textContent = Math.ceil(msg.hp || 100);
+        if (levelDisplay) levelDisplay.textContent = msg.level;
+        
+        this.showUpgradeModal(msg.options || ['multishot', 'fireRate', 'damage']);
+    }
+    
+    showUpgradeModal(options) {
+        if (!levelupModal || !upgradeOptionsContainer) return;
+        
+        isPaused = true;
+        this.pendingLevelUp = options;
+        
+        const upCfg = SharedConfig.MULTIPLAYER.UPGRADES;
+        upgradeOptionsContainer.innerHTML = '';
+        
+        options.forEach(optKey => {
+            const cfg = upCfg[optKey];
+            if (!cfg) return;
+            const currentLvl = this.upgrades[optKey] || 0;
+            
+            const card = document.createElement('div');
+            card.className = 'upgrade-card';
+            card.dataset.type = optKey;
+            card.innerHTML = `
+                <div class="upgrade-icon" style="color:${cfg.color}; border-color:${cfg.color};">
+                    ${cfg.icon}
+                </div>
+                <div class="upgrade-name">${cfg.name}</div>
+                <div class="upgrade-desc">${cfg.desc}</div>
+                <div class="upgrade-status">
+                    <div class="status-label">
+                        <span>等級</span><span>Lv.${currentLvl}</span>
+                    </div>
+                    <div class="level-progress-bar">
+                        <div class="progress-fill" style="background:${cfg.color};"></div>
+                    </div>
+                </div>
+            `;
+            card.onclick = () => this.selectUpgrade(optKey);
+            upgradeOptionsContainer.appendChild(card);
+        });
+        
+        levelupModal.classList.remove('hidden');
+    }
+    
+    selectUpgrade(upgradeType) {
+        if (!this.pendingLevelUp || !this.pendingLevelUp.includes(upgradeType)) return;
+        
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'select_upgrade',
+                upgradeType: upgradeType
+            }));
+        }
+        
+        this.pendingLevelUp = null;
+        if (levelupModal) levelupModal.classList.add('hidden');
+        isPaused = false;
+    }
+    
+    requestAirSupport() {
+        if (!this.active || !this.alive || !this.airSupportReady) return;
+        
+        if (controlMode === 'pc') {
+            this.airSupportTargeting = true;
+            showNotification(t('🎯 選擇空襲目標位置（點擊畫面）'));
+        } else {
+            this.sendAirSupport(this.localX, this.localY);
+        }
+    }
+    
+    sendAirSupport(x, y) {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'use_air_support',
+                x: x,
+                y: y
+            }));
+            this.airSupportReady = false;
+            this.airSupportTargeting = false;
+            playSound('jet_flyover');
+        }
+    }
+    
+    handleAirstrikeIncoming(msg) {
+        playSound('alarm');
+        if (airRaidWarning) {
+            airRaidWarning.classList.remove('hidden');
+            const timerEl = warningTimerDisplay;
+            if (timerEl) timerEl.textContent = '1.5';
+            let t = 1500;
+            const iv = setInterval(() => {
+                t -= 100;
+                if (timerEl) timerEl.textContent = (t/1000).toFixed(1);
+                if (t <= 0) {
+                    clearInterval(iv);
+                    if (airRaidWarning) airRaidWarning.classList.add('hidden');
+                }
+            }, 100);
+        }
+        
+        this.airStrikes.push({
+            x: msg.x,
+            y: msg.y,
+            startTime: Date.now(),
+            exploded: false,
+            _incomingOwner: msg.ownerName
+        });
+    }
+    
+    handleAirstrikeExplode(msg) {
+        playSound('explosion');
+        if (gameSettings.screenShake) screenShake = 20;
+        
+        const x = msg.x - camera.x;
+        const y = msg.y - camera.y;
+        
+        for (let i = 0; i < 30; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 20,
+                vy: (Math.random() - 0.5) * 20,
+                life: 1,
+                color: `hsl(${Math.random()*40 + 10}, 100%, 60%)`,
+                size: Math.random() * 8 + 4
+            });
+        }
+    }
+    
+    handlePlayerDeath(msg) {
+        this.alive = false;
+        this.respawnAt = msg.respawnAt;
+        playSound('explosion');
+        
+        if (gameSettings.screenShake) screenShake = 30;
+        
+        const deathScreen = document.getElementById('multiplayer-death-screen');
+        const respawnTimer = document.getElementById('respawn-timer');
+        const deathScore = document.getElementById('death-score');
+        const deathKills = document.getElementById('death-kills');
+        const deathLevel = document.getElementById('death-level');
+        
+        if (deathScore) deathScore.textContent = msg.score || 0;
+        if (deathKills) deathKills.textContent = msg.kills || 0;
+        if (deathLevel) deathLevel.textContent = msg.level || 1;
+        if (deathScreen) deathScreen.classList.remove('hidden');
+        
+        const updateTimer = () => {
+            if (!this.active || this.alive) {
+                if (deathScreen) deathScreen.classList.add('hidden');
+                return;
+            }
+            const remaining = Math.max(0, this.respawnAt - Date.now());
+            if (respawnTimer) respawnTimer.textContent = `${(remaining/1000).toFixed(1)}s`;
+            if (remaining > 0 && !this.alive) {
+                requestAnimationFrame(updateTimer);
+            }
+        };
+        updateTimer();
+    }
+    
+    handlePlayerRespawn(msg) {
+        this.alive = true;
+        this.localX = msg.x;
+        this.localY = msg.y;
+        this.respawnAt = 0;
+        playSound('xp');
+        showNotification(t('🔄 已重返戰場！'));
+        
+        const deathScreen = document.getElementById('multiplayer-death-screen');
+        if (deathScreen) deathScreen.classList.add('hidden');
+    }
+    
+    handleGameEnd(msg) {
+        this.gameEnded = true;
+        endMultiplayerGame(msg);
     }
 
     sendInput() {
         if (!this.active || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+        if (!this.alive || isPaused) return;
         
-        // 1. 本地移動預測 (Client-side Prediction)
-        const baseSpeed = config.playerSpeed;
+        const baseSpeed = config.playerSpeed * (1 + (this.upgrades.speed * 0.08));
         let dx, dy;
         
         if (controlMode === 'mobile') {
@@ -2452,15 +2672,12 @@ class MultiplayerManager {
         }
 
         const now = Date.now();
-        
-        // 2. 自動射擊音效修復
         if (!this.lastSoundTime) this.lastSoundTime = 0;
         
-        // 3. 多人自動瞄準：優先鎖定最近的威脅
         let targetAngle = Math.atan2(mouseY - canvas.height/2, mouseX - canvas.width/2);
         let hasEnemy = false;
 
-        if (this.enemies && this.enemies.length > 0) {
+        if (gameSettings.autoAim && this.enemies && this.enemies.length > 0) {
             let closestDist = Infinity;
             let closestEnemy = null;
             this.enemies.forEach(e => {
@@ -2470,22 +2687,34 @@ class MultiplayerManager {
                     closestEnemy = e;
                 }
             });
-            // 只要地圖上有敵人，就優先鎖定最近的 (範圍擴大到 1000)
             if (closestEnemy && closestDist < 1000) {
                 targetAngle = Math.atan2(closestEnemy.y - this.localY, closestEnemy.x - this.localX);
                 hasEnemy = true;
             }
+        } else if (this.enemies && this.enemies.length > 0) {
+            let closestDist = Infinity;
+            let closestEnemy = null;
+            this.enemies.forEach(e => {
+                const dist = Math.hypot(this.localX - e.x, this.localY - e.y);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestEnemy = e;
+                }
+            });
+            if (closestEnemy && closestDist < 800) {
+                hasEnemy = true;
+            }
         }
 
-        // 決定是否射擊：有敵人或是使用者按下滑鼠
         const isShooting = hasEnemy || mouseDown;
+        const effFireRate = Math.max(50, config.fireRate * (1 - this.upgrades.fireRate * 0.08));
 
-        if (isShooting && now - this.lastSoundTime > config.fireRate) {
+        if (isShooting && now - this.lastSoundTime > effFireRate) {
             playSound('shoot');
             this.lastSoundTime = now;
         }
 
-        if (now - this.lastInputSent < 33) return; // 降至 30Hz 傳送輸入，減少網路擁塞
+        if (now - this.lastInputSent < 33) return;
         
         this.socket.send(JSON.stringify({
             type: 'input',
@@ -2495,16 +2724,24 @@ class MultiplayerManager {
         }));
         this.lastInputSent = now;
     }
+    
+    handleCanvasClick(cx, cy) {
+        if (this.airSupportTargeting) {
+            const wx = cx + camera.x;
+            const wy = cy + camera.y;
+            this.sendAirSupport(wx, wy);
+            return true;
+        }
+        return false;
+    }
 
     draw(ctx) {
         if (!this.active) return;
         
         ctx.save();
 
-        // 0. 繪製與單人模式一致的背景網格
         this.drawMultiplayerGrid(ctx);
 
-        // 1. Draw XP Orbs (強化發光與呼吸效果)
         this.xpOrbs.forEach(orb => {
             const dx = orb.x - camera.x;
             const dy = orb.y - camera.y;
@@ -2515,24 +2752,8 @@ class MultiplayerManager {
             ctx.beginPath();
             ctx.arc(dx, dy, r, 0, Math.PI * 2);
             ctx.fillStyle = '#00ffcc';
-            ctx.shadowBlur = 20; // 增加發光強度以同步單人模式視覺
+            ctx.shadowBlur = gameSettings.particleQuality === 'low' ? 10 : 20;
             ctx.shadowColor = '#00ffcc';
-            ctx.fill();
-            ctx.restore();
-        });
-
-        // 2. Draw items (Money, Health)
-        this.moneyDrops.forEach(drop => {
-            const dx = drop.x - camera.x;
-            const dy = drop.y - camera.y;
-            const r = 10 + Math.sin(Date.now() / 300) * 2;
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.fillStyle = 'rgba(255, 215, 0, 0.9)';
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = '#ffd700';
-            ctx.beginPath();
-            ctx.arc(dx, dy, r, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
         });
@@ -2553,28 +2774,61 @@ class MultiplayerManager {
             ctx.fillRect(dx - r * 0.6, dy - r * 0.2, r * 1.2, r * 0.4);
             ctx.restore();
         });
+        
+        this.airStrikes.forEach(strike => {
+            const dx = strike.x - camera.x;
+            const dy = strike.y - camera.y;
+            const elapsed = Date.now() - strike.startTime;
+            const progress = Math.min(1, elapsed / 1500);
+            
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            
+            if (progress < 1) {
+                ctx.strokeStyle = `rgba(255, 50, 50, ${0.5 + Math.sin(elapsed/50)*0.3})`;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 10]);
+                ctx.beginPath();
+                ctx.arc(dx, dy, 150, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.strokeStyle = `rgba(255, 100, 0, ${0.8})`;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.moveTo(dx, dy - 200);
+                ctx.lineTo(dx, dy + 200);
+                ctx.moveTo(dx - 200, dy);
+                ctx.lineTo(dx + 200, dy);
+                ctx.stroke();
+            } else {
+                const expR = 30 + progress * 120;
+                const grad = ctx.createRadialGradient(dx, dy, 0, dx, dy, expR);
+                grad.addColorStop(0, 'rgba(255, 200, 100, 0.8)');
+                grad.addColorStop(0.5, 'rgba(255, 100, 0, 0.5)');
+                grad.addColorStop(1, 'rgba(255, 0, 0, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(dx, dy, expR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        });
 
-        // 3. Draw enemies (Slime 動畫與 Variety)
         this.enemies.forEach(e => {
             const dx = e.x - camera.x;
             const dy = e.y - camera.y;
             
-            const slimeTypes = {
-                normal: { color: '#44ff44', radius: 15 },
-                fast: { color: '#4488ff', radius: 12 },
-                tank: { color: '#ff4444', radius: 22 },
-                elite: { color: '#aa44ff', radius: 20 },
-                gold: { color: '#ffff44', radius: 10 },
-                boss: { color: '#ff00ff', radius: 60 }
-            };
-            const config = slimeTypes[e.type] || slimeTypes.normal;
-            const r = e.radius || config.radius;
+            if (dx < -200 || dx > canvas.width + 200 || dy < -200 || dy > canvas.height + 200) return;
+            
+            const typeCfg = SharedConfig.SLIME_TYPES[e.type] || SharedConfig.SLIME_TYPES.normal;
+            const color = typeCfg.color;
+            const r = e.radius || 25;
 
             ctx.save();
             ctx.translate(dx, dy);
             
-            // Boss Aura
-            if (e.isBoss || e.type === 'boss') {
+            if (e.isBoss) {
                 const auraSize = r + 15 + Math.sin(Date.now() / 100) * 10;
                 const gradient = ctx.createRadialGradient(0, 0, r, 0, 0, auraSize);
                 gradient.addColorStop(0, 'rgba(255, 0, 255, 0.5)');
@@ -2593,30 +2847,33 @@ class MultiplayerManager {
             ctx.quadraticCurveTo(-r, -r, 0, -r);
             ctx.quadraticCurveTo(r, -r, r, r);
             ctx.lineTo(-r, r);
-            ctx.fillStyle = config.color;
+            ctx.fillStyle = color;
+            if (gameSettings.particleQuality !== 'low') {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = color;
+            }
             ctx.fill();
 
-            // Eyes
-            ctx.fillStyle = (e.isBoss || e.type === 'boss') ? '#ff0000' : '#000';
+            ctx.fillStyle = e.isBoss ? '#ff0000' : '#000';
             ctx.beginPath();
             ctx.arc(-r/3, 0, r/6, 0, Math.PI * 2);
             ctx.arc(r/3, 0, r/6, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
 
-            // HP bar
             if (e.hp < e.maxHp) {
                 ctx.fillStyle = '#222';
                 ctx.fillRect(dx - r, dy - r - 15, r * 2, 6);
-                ctx.fillStyle = '#ff0000';
+                ctx.fillStyle = e.isBoss ? '#ff00ff' : '#ff0000';
                 ctx.fillRect(dx - r, dy - r - 15, (r * 2) * (e.hp / e.maxHp), 6);
             }
         });
 
-        // 4. Draw bullets (與單人模式一致的高級發光效果)
         this.bullets.forEach(b => {
             const dx = b.x - camera.x;
             const dy = b.y - camera.y;
+            if (dx < -50 || dx > canvas.width + 50 || dy < -50 || dy > canvas.height + 50) return;
+            
             const r = 6;
             const hue = 180; 
 
@@ -2633,26 +2890,55 @@ class MultiplayerManager {
             ctx.fill();
             ctx.restore();
         });
+        
+        if (this.airSupportTargeting) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 100, 0, 0.7)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(mouseX, mouseY, 150, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(mouseX - 30, mouseY);
+            ctx.lineTo(mouseX + 30, mouseY);
+            ctx.moveTo(mouseX, mouseY - 30);
+            ctx.lineTo(mouseX, mouseY + 30);
+            ctx.strokeStyle = 'rgba(255, 100, 0, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        }
 
-        // 5. Draw players (Neon 光環與高光)
         const drawnIds = new Set();
+        // 每幀計算一次 dt,供角色精靈動畫共用
+        const __nowMs = performance.now();
+        this._spriteDt = Math.min(0.05, (__nowMs - (this._lastSpriteTs || __nowMs)) / 1000);
+        this._lastSpriteTs = __nowMs;
+
         this.players.forEach(p => {
             drawnIds.add(p.id);
-            const px = (p.id === this.playerId) ? this.localX : p.x;
-            const py = (p.id === this.playerId) ? this.localY : p.y;
             
+            let px, py;
             if (p.id === this.playerId) {
-                this.drawSinglePlayer(ctx, { ...p, hp: player.hp, maxHp: player.maxHp }, px, py);
+                px = this.alive ? this.localX : (p.x || 0);
+                py = this.alive ? this.localY : (p.y || 0);
             } else {
-                this.drawSinglePlayer(ctx, p, px, py);
+                const smooth = this.otherPlayersSmooth.get(p.id);
+                px = smooth ? smooth.x : p.x;
+                py = smooth ? smooth.y : p.y;
             }
+            
+            this.drawSinglePlayer(ctx, p, px, py);
         });
 
         if (!drawnIds.has(this.playerId)) {
             this.drawSinglePlayer(ctx, {
                 id: this.playerId,
-                name: currentUser ? currentUser.username : '連線中...',
-                hp: 100, maxHp: 100
+                name: currentUser ? currentUser.username : t('連線中...'),
+                hp: 100, maxHp: 100,
+                alive: true
             }, this.localX, this.localY);
         }
 
@@ -2684,39 +2970,85 @@ class MultiplayerManager {
     drawSinglePlayer(ctx, p, px, py) {
         const dx = px - camera.x;
         const dy = py - camera.y;
-        const color = p.id === this.playerId ? '#00ffff' : '#ff00ff';
+        const isLocal = p.id === this.playerId;
+        const color = isLocal ? '#00ffff' : '#ff00ff';
+        const isAlive = p.alive !== false;
 
+        // 角色精靈(character.js):本地與遠端玩家共用像素動畫,每玩家獨立狀態機
+        if (typeof CharacterAnim === 'function') {
+            const dt = this._spriteDt || 0.016;
+            if (!this.playerAnims) this.playerAnims = new Map();
+            let st = this.playerAnims.get(p.id);
+            if (!st) { st = { anim: new CharacterAnim(), lastX: px, lastY: py, wasAlive: isAlive }; this.playerAnims.set(p.id, st); }
+            st.vx = px - st.lastX; st.vy = py - st.lastY;
+            st.lastX = px; st.lastY = py;
+            if (st.wasAlive !== isAlive) st.anim.reset(); // 死亡↔復活轉換時重置狀態機(解鎖死亡鎖定)
+            st.wasAlive = isAlive;
+            const moving = Math.abs(st.vx) + Math.abs(st.vy) > 0.5;
+            st.anim.update(dt, moving, false, !isAlive);
+            st.anim.dirIndex(st.vx, st.vy);
+            ctx.save();
+            if (!isAlive) ctx.globalAlpha = 0.3;
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = color;
+            st.anim.draw(ctx, px, py, camera, 1.25, moving);
+            ctx.restore();
+        } else {
+            // fallback:character.js 未載入時沿用圓圈繪製
+            ctx.save();
+
+            if (!isAlive) {
+                ctx.globalAlpha = 0.3;
+            }
+
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = color;
+
+            ctx.beginPath();
+            ctx.arc(dx, dy, 20, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(dx - 6, dy - 6, 7, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.fill();
+            ctx.restore();
+        }
+        
         ctx.save();
-        // Neon Glow
-        ctx.shadowBlur = 25;
-        ctx.shadowColor = color;
-        
-        ctx.beginPath();
-        ctx.arc(dx, dy, 20, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // Inner Highlight
-        ctx.beginPath();
-        ctx.arc(dx - 6, dy - 6, 7, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.fill();
-        ctx.restore();
-        
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(p.name, dx, dy - 35);
         
-        const barW = 44;
+        let nameTag = p.name;
+        if (isLocal) nameTag += t(' (你)');
+        ctx.fillText(nameTag, dx, dy - 35);
+        
+        const barW = 50;
         const barH = 6;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fillRect(dx - barW/2, dy - 55, barW, barH);
-        ctx.fillStyle = p.id === this.playerId ? '#00ff00' : '#ff00ff';
-        ctx.fillRect(dx - barW/2, dy - 55, barW * (p.hp / (p.maxHp || 100)), barH);
+        
+        const hpRatio = Math.max(0, (p.hp || 0) / (p.maxHp || 100));
+        ctx.fillStyle = isLocal ? '#00ff00' : '#ff00ff';
+        ctx.fillRect(dx - barW/2, dy - 55, barW * hpRatio, barH);
+        
+        if (!isAlive && isLocal) {
+            ctx.fillStyle = '#ff4444';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(t('💀 陣亡'), dx, dy - 70);
+        }
+        
+        if (p.level && p.level > 1) {
+            ctx.fillStyle = '#ffcc00';
+            ctx.font = 'bold 10px Arial';
+            ctx.fillText(`Lv.${p.level}`, dx, dy + 38);
+        }
+        ctx.restore();
     }
 }
 
@@ -2733,27 +3065,46 @@ class Player {
         this.level = 1;
         this.xp = 0;
         this.xpToNextLevel = 100;
+        this.diamond = 0;  // 新增: 鑽石資源
         this.lastShotTime = 0;
+        // === 可互動角色系統:動畫狀態機 ===
+        this.anim = new CharacterAnim();
+        this.prevX = x;
+        this.prevY = y;
+        this.aimAngle = 0;
+        this.lastHurtAt = 0;
     }
 
     draw() {
+        // === 角色 sprite 動畫繪製(橘雪莉配色程序化 sprite sheet)===
+        this.anim.draw(ctx, this.x, this.y, camera, 1, this.anim.state === 'run');
+        // 保留原有光暈效果:在角色下方畫光環
+        ctx.save();
         ctx.beginPath();
-        ctx.arc(this.x - camera.x, this.y - camera.y, this.radius, 0, Math.PI * 2, false);
-        ctx.fillStyle = this.color;
-        
-        // Add glow
-        ctx.shadowBlur = 20;
+        ctx.arc(this.x - camera.x, this.y - camera.y + 14, this.radius + 2, 0, Math.PI * 2, false);
+        ctx.fillStyle = 'rgba(68, 136, 255, 0.10)';
+        ctx.shadowBlur = 14;
         ctx.shadowColor = this.color;
         ctx.fill();
-        
-        // Add inner highlight
+        ctx.restore();
+        // 瞄準指示(槍口小圓點,依射擊方向)
+        const gx = this.x - camera.x + Math.cos(this.aimAngle) * (this.radius + 8);
+        const gy = this.y - camera.y + Math.sin(this.aimAngle) * (this.radius + 8);
         ctx.beginPath();
-        ctx.arc(this.x - camera.x - 3, this.y - camera.y - 3, this.radius * 0.4, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.arc(gx, gy, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#00ffff';
         ctx.fill();
-        
-        ctx.shadowBlur = 0;
-        ctx.closePath();
+    }
+
+    updateAnim(dt) {
+        const vx = this.x - this.prevX;
+        const vy = this.y - this.prevY;
+        const moving = (vx !== 0 || vy !== 0);
+        const hurt = (Date.now() - this.lastHurtAt < 300);
+        this.anim.update(dt, moving, hurt, false);
+        if (moving) this.anim.dirIndex(vx, vy);
+        this.prevX = this.x;
+        this.prevY = this.y;
     }
 
     update(dt) {
@@ -2774,6 +3125,8 @@ class Player {
             this.shoot();
             this.lastShotTime = now;
         }
+        // 動畫狀態機更新(dt 以 60fps 幀間近似;animate() 無 dt 傳遞)
+        this.updateAnim(1 / 60);
     }
 
     shoot() {
@@ -2804,6 +3157,7 @@ class Player {
         }
 
         playSound('shoot');
+        this.aimAngle = angle;
         
         // Handle multishot
         const bulletCount = 1 + playerUpgrades.multishot.level;
@@ -2835,12 +3189,13 @@ class Player {
         this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.2);
         
         createFloatingText(this.x, this.y, "LEVEL UP!", "#ffff00");
-        playRadioVoice("戰術建議：優先強化火力與機動，保持輸出與距離");
+        playRadioVoice(t('戰術建議：優先強化火力與機動，保持輸出與距離'));
         showLevelUpScreen();
     }
 
     takeDamage(amount) {
         this.hp -= amount;
+        this.lastHurtAt = Date.now();   // 觸發受擊動畫
         if (gameSettings.screenShake) {
             screenShake = 10; // Trigger screen shake
         }
@@ -2911,6 +3266,120 @@ class Projectile {
     }
 }
 
+function drawEnemyEntity(ctx, x, y, type, radius, hp, maxHp, isBoss, angle) {
+    const drawX = x - camera.x;
+    const drawY = y - camera.y;
+    const r = radius;
+    const time = Date.now() / 1000;
+    const config = SharedConfig.SLIME_TYPES[type] || SharedConfig.SLIME_TYPES.normal;
+    const color = config.color;
+
+    ctx.save();
+    ctx.translate(drawX, drawY);
+
+    if (isBoss || type === 'boss') {
+        // Boss Aura (Scales with HP)
+        const auraAlpha = 0.2 + (1 - hp / maxHp) * 0.4;
+        const auraSize = r + 20 + Math.sin(time * 5) * 15;
+        const gradient = ctx.createRadialGradient(0, 0, r, 0, 0, auraSize);
+        gradient.addColorStop(0, `rgba(255, 0, 255, ${auraAlpha})`);
+        gradient.addColorStop(1, 'rgba(255, 0, 255, 0)');
+        ctx.beginPath();
+        ctx.arc(0, 0, auraSize, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+    }
+
+    ctx.rotate(angle);
+
+    // Walking animation (Legs)
+    const walkCycle = (x + y) * 0.05; // Use position for consistent walk cycle across frames
+    const legMovement = Math.sin(time * 10 + walkCycle) * (isBoss ? 20 : 15);
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = isBoss ? 8 : 4;
+    
+    const legCount = (isBoss || type === 'boss') ? 8 : (type === 'tank' ? 6 : 4);
+    for (let i = 0; i < legCount; i++) {
+        ctx.save();
+        ctx.rotate((Math.PI * 2 / legCount) * i);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(r * 0.9, r * 0.9 + (i % 2 === 0 ? legMovement : -legMovement));
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // Main Body
+    const bodyPulse = Math.sin(time * 5) * (isBoss ? 5 : 2);
+    const rageScale = (isBoss || type === 'boss') ? (1 + (1 - hp / maxHp) * 0.3) : 1;
+    ctx.scale(rageScale, rageScale);
+
+    ctx.shadowBlur = isBoss ? 30 : 15;
+    ctx.shadowColor = color;
+
+    ctx.fillStyle = (isBoss || type === 'boss') ? '#111' : '#222';
+    ctx.beginPath();
+    if (type === 'normal') {
+        ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0);
+    } else if (type === 'fast') {
+        ctx.moveTo(r * 1.2, 0); ctx.lineTo(-r * 0.8, -r * 0.8); ctx.lineTo(-r * 0.5, 0); ctx.lineTo(-r * 0.8, r * 0.8);
+    } else if (type === 'tank') {
+        for(let i=0; i<6; i++) {
+            const a = (Math.PI * 2 / 6) * i;
+            ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+    } else if (isBoss || type === 'boss') {
+        for(let i=0; i<8; i++) {
+            const a = (Math.PI * 2 / 8) * i;
+            ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+    } else {
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isBoss ? 4 : 2;
+    ctx.stroke();
+
+    // Core
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.3 + bodyPulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sensors
+    ctx.fillStyle = '#fff';
+    if (isBoss || type === 'boss') {
+        ctx.beginPath();
+        ctx.arc(r * 0.5, -r * 0.2, r * 0.1, 0, Math.PI * 2);
+        ctx.arc(r * 0.5, r * 0.2, r * 0.1, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        ctx.beginPath();
+        ctx.arc(r * 0.4, 0, r * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+
+    // HP Bar
+    if (hp < maxHp) {
+        const barW = r * 2;
+        const barH = isBoss ? 15 : 6;
+        const barY = -r - (isBoss ? 40 : 15);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(drawX - r, drawY + barY, barW, barH);
+        ctx.fillStyle = color;
+        ctx.fillRect(drawX - r, drawY + barY, barW * (hp / maxHp), barH);
+        if (isBoss) {
+            ctx.strokeStyle = '#fff';
+            ctx.strokeRect(drawX - r, drawY + barY, barW, barH);
+        }
+    }
+}
+
 class Enemy {
     constructor(x, y, type = 'normal') {
         this.x = x;
@@ -2935,86 +3404,7 @@ class Enemy {
     }
 
     draw() {
-        const drawX = this.x - camera.x;
-        const drawY = this.y - camera.y;
-        const r = this.radius;
-        const time = Date.now() / 1000;
-
-        ctx.save();
-        ctx.translate(drawX, drawY);
-        ctx.rotate(this.angle);
-
-        // Walking animation (Legs)
-        const legMovement = Math.sin(time * 10 + this.walkCycle) * 15;
-        ctx.strokeStyle = '#444';
-        ctx.lineWidth = 4;
-        
-        // Draw 4-6 legs based on type
-        const legCount = this.type === 'tank' ? 6 : 4;
-        for (let i = 0; i < legCount; i++) {
-            ctx.save();
-            ctx.rotate((Math.PI * 2 / legCount) * i);
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(r * 0.8, r * 0.8 + (i % 2 === 0 ? legMovement : -legMovement));
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        // Main Body (Metallic/Futuristic look)
-        const bodyPulse = Math.sin(time * 5) * 2;
-        
-        // Shadow/Glow
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = this.color;
-
-        // Body Shape
-        ctx.fillStyle = '#222'; // Base dark metal
-        ctx.beginPath();
-        if (this.type === 'normal') {
-            // Scout: Diamond shape
-            ctx.moveTo(0, -r);
-            ctx.lineTo(r, 0);
-            ctx.lineTo(0, r);
-            ctx.lineTo(-r, 0);
-        } else if (this.type === 'fast') {
-            // Striker: Sharp triangular shape
-            ctx.moveTo(r * 1.2, 0);
-            ctx.lineTo(-r * 0.8, -r * 0.8);
-            ctx.lineTo(-r * 0.5, 0);
-            ctx.lineTo(-r * 0.8, r * 0.8);
-        } else if (this.type === 'tank') {
-            // Tank: Hexagon heavy shape
-            for(let i=0; i<6; i++) {
-                const a = (Math.PI * 2 / 6) * i;
-                const px = Math.cos(a) * r;
-                const py = Math.sin(a) * r;
-                if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-            }
-        } else {
-            // Default: Circular tech pod
-            ctx.arc(0, 0, r, 0, Math.PI * 2);
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Tech lines / Core
-        ctx.shadowBlur = 10;
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.3 + bodyPulse, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Eye / Sensor
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(r * 0.4, 0, r * 0.15, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
+        drawEnemyEntity(ctx, this.x, this.y, this.type, this.radius, this.hp, this.maxHp, false, this.angle);
     }
 
     update() {
@@ -3047,105 +3437,7 @@ class Boss extends Enemy {
     }
 
     draw() {
-        const drawX = this.x - camera.x;
-        const drawY = this.y - camera.y;
-        const r = this.radius;
-        const time = Date.now() / 1000;
-
-        ctx.save();
-        ctx.translate(drawX, drawY);
-
-        // Boss Aura (Scales with HP)
-        const auraAlpha = 0.2 + (1 - this.hp / this.maxHp) * 0.4;
-        const auraSize = r + 20 + Math.sin(time * 5) * 15;
-        const gradient = ctx.createRadialGradient(0, 0, r, 0, 0, auraSize);
-        gradient.addColorStop(0, `rgba(255, 0, 255, ${auraAlpha})`);
-        gradient.addColorStop(1, 'rgba(255, 0, 255, 0)');
-        ctx.beginPath();
-        ctx.arc(0, 0, auraSize, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        // Skill Warnings
-        if (this.currentState === 'charging') {
-            ctx.beginPath();
-            ctx.arc(0, 0, auraSize * 1.5, 0, Math.PI * 2);
-            ctx.strokeStyle = '#ff0000';
-            ctx.lineWidth = 3;
-            ctx.setLineDash([10, 10]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
-
-        // Heavy Mech Body
-        ctx.rotate(this.angle);
-        
-        // Legs (8 legs for boss)
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 8;
-        const legMovement = Math.sin(time * 8) * 20;
-        for(let i=0; i<8; i++) {
-            ctx.save();
-            ctx.rotate((Math.PI * 2 / 8) * i);
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(r * 0.9, r * 0.9 + (i%2===0 ? legMovement : -legMovement));
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        // Main Fortress Body
-        const rageScale = 1 + (1 - this.hp / this.maxHp) * 0.3;
-        ctx.scale(rageScale, rageScale);
-        
-        ctx.shadowBlur = 30;
-        ctx.shadowColor = this.color;
-        
-        ctx.fillStyle = '#111';
-        ctx.beginPath();
-        // Octagon Fortress
-        for(let i=0; i<8; i++) {
-            const a = (Math.PI * 2 / 8) * i;
-            const px = Math.cos(a) * r;
-            const py = Math.sin(a) * r;
-            if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = 4;
-        ctx.stroke();
-
-        // Core & Energy lines
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.4 + Math.sin(time * 10) * 5, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Dual Sensors
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(r * 0.5, -r * 0.2, r * 0.1, 0, Math.PI * 2);
-        ctx.arc(r * 0.5, r * 0.2, r * 0.1, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.restore();
-
-        // Boss Health Bar
-        ctx.save();
-        ctx.translate(drawX, drawY);
-        ctx.fillStyle = '#222';
-        ctx.fillRect(-r, -r - 40, r * 2, 15);
-        ctx.fillStyle = this.color;
-        ctx.fillRect(-r, -r - 40, (r * 2) * (this.hp / this.maxHp), 15);
-        ctx.strokeStyle = '#fff';
-        ctx.strokeRect(-r, -r - 40, r * 2, 15);
-        
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(`WARNING: ${this.name}`, 0, -r - 55);
-        ctx.restore();
+        drawEnemyEntity(ctx, this.x, this.y, 'boss', this.radius, this.hp, this.maxHp, true, this.angle);
     }
 
     update() {
@@ -3680,7 +3972,7 @@ function requestAirSupport() {
     airSupportConfig.lastUsed = now;
     
     // 1. Voice Request
-    playRadioVoice("請求空中火力打擊支援，座標已確認");
+    playRadioVoice(t('請求空中火力打擊支援，座標已確認'));
     
     // 2. Start Alarm & Countdown UI
     let timeLeft = 5; // Reduced to 5 seconds
@@ -3756,7 +4048,11 @@ window.addEventListener('keydown', (e) => {
         togglePause();
     }
     if (e.code === 'Space' && gameRunning && !isPaused) {
-        requestAirSupport();
+        if (multiplayer.active) {
+            multiplayer.requestAirSupport();
+        } else {
+            requestAirSupport();
+        }
     }
     if ((e.key === 't' || e.key === 'T') && targetingState.active && !targetingState.locked) {
         targetingState.mode = targetingState.mode === 'manual' ? 'auto' : 'manual';
@@ -4168,6 +4464,13 @@ function animate() {
                     spawnDrops(enemy.x, enemy.y);
                     score += 10;
                     totalKills += 1; // Increment total kills
+                    
+                    // Diamond reward for Boss kill
+                    if (enemy.isBoss) {
+                        player.diamond += 10;
+                        showNotification(t('diamond_drop', {count: 10}));
+                    }
+                    
                     scoreDisplay.textContent = score;
 
                     // Spawn Boss every 100 kills
@@ -4177,7 +4480,7 @@ function animate() {
                         const bx = player.x + Math.cos(angle) * dist;
                         const by = player.y + Math.sin(angle) * dist;
                         enemies.push(new Boss(bx, by));
-                        showNotification("🚨 強力生物特徵已偵測：大型 BOSS 進入戰場！ 🚨");
+                        showNotification(t('🚨 強力生物特徵已偵測：大型 BOSS 進入戰場！ 🚨'));
                         playSound('alarm');
                     }
 
@@ -4186,7 +4489,7 @@ function animate() {
                     // Boss Special Death Logic: Split into elite slimes
                     if (enemy.isBoss) {
                         playSound('explosion');
-                        showNotification("⚠️ BOSS 核心崩解：偵測到多個高能反應！");
+                        showNotification(t('⚠️ BOSS 核心崩解：偵測到多個高能反應！'));
                         for (let k = 0; k < 5; k++) {
                             const angle = (Math.PI * 2 / 5) * k;
                             const sx = enemy.x + Math.cos(angle) * 50;
@@ -4231,7 +4534,7 @@ function animate() {
             militaryFunds += drop.amount;
             saveMetaProgress();
             updateFundsUI();
-            createFloatingText(drop.x, drop.y, `+${drop.amount} 軍資`, '#ffff00');
+            createFloatingText(drop.x, drop.y, tf('+{amount} 軍資', { amount: drop.amount }), '#ffff00');
             playSound('xp');
             moneyDrops.splice(i, 1);
         }
@@ -4279,7 +4582,7 @@ function animate() {
 let bossHintShown = false;
 function showNotification(message) {
     if (!gameNotification || !notificationText) return;
-    notificationText.textContent = message;
+    notificationText.textContent = t(message);
     gameNotification.classList.remove('hidden');
     gameNotification.classList.add('active');
     
@@ -4301,8 +4604,8 @@ const AIAdvisor = {
         let messages = [];
 
         if (player.hp < player.maxHp * 0.3) {
-            messages.push("戰術分析：裝甲受損嚴重！建議暫避鋒芒，尋找周圍的維修包補給！");
-            messages.push("警告：生命值低下！立刻使用機動躲避，等待空襲冷卻！");
+            messages.push(t('戰術分析：裝甲受損嚴重！建議暫避鋒芒，尋找周圍的維修包補給！'));
+            messages.push(t('警告：生命值低下！立刻使用機動躲避，等待空襲冷卻！'));
         }
 
         let enemiesNear = 0;
@@ -4313,30 +4616,30 @@ const AIAdvisor = {
         }
         
         if (enemiesNear > 25) {
-            messages.push("戰場掃描：偵測到大量敵軍包圍！優先將砲火集中於突圍缺口！");
-            messages.push("戰術建議：敵方密度過高，請盡速施展戰術走位拉開距離！");
+            messages.push(t('戰場掃描：偵測到大量敵軍包圍！優先將砲火集中於突圍缺口！'));
+            messages.push(t('戰術建議：敵方密度過高，請盡速施展戰術走位拉開距離！'));
             if (airSupportTimer <= 0) {
-                 messages.push("系統提示：空襲支援已就緒，正是投彈清場的最佳時機！");
+                 messages.push(t('系統提示：空襲支援已就緒，正是投彈清場的最佳時機！'));
             }
         }
 
         if (militaryFunds > 1500 && Object.keys(equippedUnits).length < 5) {
-            messages.push("後勤提示：指揮官，您的軍費已十分充足，請隨時準備呼叫支援兵裝！");
+            messages.push(t('後勤提示：指揮官，您的軍費已十分充足，請隨時準備呼叫支援兵裝！'));
         }
 
         if (player.level >= 5 && player.level < 10 && !bossHintShown) {
              bossHintShown = true;
-             messages.push("戰鬥預警：前線雷達發現未知強大能量源正在接近，請保持警戒！");
+             messages.push(t('戰鬥預警：前線雷達發現未知強大能量源正在接近，請保持警戒！'));
              createFloatingText(player.x, player.y - 80, "BOSS INCOMING", "#ff4444");
         }
         
         if (messages.length === 0 && Math.random() > 0.8) {
             const generalTips = [
-                "戰場資訊：保持移動能有效降低受擊機率，尋找安全的輸出位置！",
-                "裝備提示：適時搭配不同的武器部件，才能在蟲海中殺出重圍！",
-                "系統建議：如果覺得吃力，可以回到大廳透過裝備庫強化基礎屬性。",
-                "核心提示：留意戰場上隨機掉落的補給晶體，累積能量以獲得等級優勢！",
-                "戰術建議：優先強化火力與機動，保持輸出與距離！"
+                t('戰場資訊：保持移動能有效降低受擊機率，尋找安全的輸出位置！'),
+                t('裝備提示：適時搭配不同的武器部件，才能在蟲海中殺出重圍！'),
+                t('系統建議：如果覺得吃力，可以回到大廳透過裝備庫強化基礎屬性。'),
+                t('核心提示：留意戰場上隨機掉落的補給晶體，累積能量以獲得等級優勢！'),
+                t('戰術建議：優先強化火力與機動，保持輸出與距離！')
             ];
             messages.push(generalTips[Math.floor(Math.random() * generalTips.length)]);
         }
@@ -4365,44 +4668,162 @@ function startGame() {
     window.enemyInterval = setInterval(spawnEnemy, config.enemySpawnRate);
 }
 
+function multiplayerCanvasClickHandler(e) {
+    if (!multiplayer.active) return;
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    multiplayer.handleCanvasClick(cx, cy);
+}
+
 function startMultiplayer() {
     stopMenuBackground();
     init();
     gameRunning = true;
     startScreen.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
+    if (tacticalSkillOverlay) tacticalSkillOverlay.classList.remove('hidden');
+    if (controlMode === 'mobile') mobileControlsUI.classList.remove('hidden');
     startBackgroundMusic();
+    
+    canvas.addEventListener('click', multiplayerCanvasClickHandler);
     
     // Connect to server (only if not already connected)
     if (!multiplayer.active) {
         multiplayer.connect();
     }
     
-    // Simple multiplayer loop
     function multiplayerAnimate() {
         if (!gameRunning) return;
         animationId = requestAnimationFrame(multiplayerAnimate);
         
-        updateCamera(); // Update camera follow
+        updateCamera();
+        updateTargeting();
         
         ctx.fillStyle = '#1a1a1a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Draw grid
+        ctx.save();
+        if (screenShake > 0) {
+            const dx = (Math.random() - 0.5) * screenShake;
+            const dy = (Math.random() - 0.5) * screenShake;
+            ctx.translate(dx, dy);
+            screenShake *= 0.9;
+            if (screenShake < 0.1) screenShake = 0;
+        }
+        
         drawGrid();
         
-        // Handle network input
         multiplayer.sendInput();
         
-        // Draw all networked players, enemies, and bullets
         multiplayer.draw(ctx);
         
-        // Return to menu if disconnected
+        for (let i = explosions.length - 1; i >= 0; i--) {
+            if (!explosions[i].update()) {
+                explosions.splice(i, 1);
+            } else {
+                explosions[i].draw();
+            }
+        }
+        
+        for (let i = fighterJets.length - 1; i >= 0; i--) {
+            if (!fighterJets[i].update()) {
+                fighterJets.splice(i, 1);
+            } else {
+                fighterJets[i].draw();
+            }
+        }
+        
+        for (let i = bombs.length - 1; i >= 0; i--) {
+            if (!bombs[i].update()) {
+                bombs.splice(i, 1);
+            } else {
+                bombs[i].draw();
+            }
+        }
+        
+        for (let i = particles.length - 1; i >= 0; i--) {
+            if (!particles[i].update()) {
+                particles.splice(i, 1);
+            } else {
+                particles[i].draw();
+            }
+        }
+        
+        for (let i = shards.length - 1; i >= 0; i--) {
+            if (!shards[i].update()) {
+                shards.splice(i, 1);
+            } else {
+                shards[i].draw();
+            }
+        }
+        
+        ctx.restore();
+        
+        drawTargetingReticle();
+        
         if (!multiplayer.active && multiplayer.socket && (multiplayer.socket.readyState === WebSocket.CLOSED || multiplayer.socket.readyState === WebSocket.CLOSING)) {
             showMainMenu();
         }
     }
     multiplayerAnimate();
+}
+
+function endMultiplayerGame(msg) {
+    gameRunning = false;
+    cancelAnimationFrame(animationId);
+    clearInterval(window.enemyInterval);
+    if (tacticalSkillOverlay) tacticalSkillOverlay.classList.add('hidden');
+    if (airRaidWarning) airRaidWarning.classList.add('hidden');
+    mobileControlsUI.classList.add('hidden');
+    canvas.removeEventListener('click', multiplayerCanvasClickHandler);
+    
+    const results = (msg.results || []).slice().sort((a, b) => b.score - a.score);
+    const localResult = results.find(r => r.id === multiplayer.playerId);
+    const finalScore = localResult ? localResult.score : 0;
+    
+    recordScoreToLeaderboard(finalScore);
+    
+    let logisticsMult = 1;
+    if (localResult && localResult.units && localResult.units.logistics) {
+        logisticsMult = 1.2;
+    }
+    const gainedFunds = Math.floor(finalScore * fundsGainMultiplier * logisticsMult);
+    if (gainedFunds > 0) {
+        militaryFunds += gainedFunds;
+        saveMetaProgress();
+        updateFundsUI();
+    }
+    
+    const resultScreen = document.getElementById('multiplayer-result-screen');
+    if (resultScreen) {
+        const listEl = document.getElementById('multiplayer-result-list');
+        const scoreEl = document.getElementById('multiplayer-result-score');
+        const fundsEl = document.getElementById('multiplayer-result-funds');
+        if (listEl) {
+            listEl.innerHTML = '';
+            results.forEach((r, idx) => {
+                const rank = idx + 1;
+                const isSelf = r.id === multiplayer.playerId;
+                const row = document.createElement('div');
+                row.className = 'result-row' + (isSelf ? ' result-self' : '');
+                row.innerHTML = `
+                    <div class="result-rank">${rank}</div>
+                    <div class="result-name">${r.name || t('指揮官')}${isSelf ? t(' (你)') : ''}</div>
+                    <div class="result-score">${r.score || 0}</div>
+                    <div class="result-kills">${r.kills || 0} 擊殺</div>
+                    <div class="result-level">Lv.${r.level || 1}</div>
+                `;
+                listEl.appendChild(row);
+            });
+        }
+        if (scoreEl) scoreEl.textContent = finalScore;
+        if (fundsEl) fundsEl.textContent = gainedFunds;
+        resultScreen.classList.remove('hidden');
+    }
+    
+    stopBackgroundMusic();
+    startMenuMusic();
 }
 
 function endGame() {
@@ -4429,7 +4850,7 @@ function showMainMenu() {
     // 如果遊戲正在運行中返回主選單，先儲存當前進度與分數
     if (gameRunning) {
         if (score > 0) {
-            console.log("主動返回選單：儲存分數", score);
+            console.log(t('主動返回選單：儲存分數'), score);
             recordScoreToLeaderboard(score);
             const gainedFunds = Math.floor(score * fundsGainMultiplier);
             if (gainedFunds > 0) {
@@ -4472,7 +4893,7 @@ function showMainMenu() {
 // 實作頁面重新整理前的自動儲存機制
 window.addEventListener('beforeunload', () => {
     if (gameRunning && score > 0) {
-        console.log("頁面重新整理：緊急儲存分數", score);
+        console.log(t('頁面重新整理：緊急儲存分數'), score);
         recordScoreToLeaderboard(score);
         const gainedFunds = Math.floor(score * fundsGainMultiplier);
         if (gainedFunds > 0) {
@@ -4481,12 +4902,6 @@ window.addEventListener('beforeunload', () => {
         }
     }
 });
-
-resizeCanvas();
-startMenuBackground();
-if (musicEnabled) {
-    startMenuMusic();
-}
 
 
 function ensureMenuMusicNode() {
@@ -4613,4 +5028,10 @@ function setMusicDuck(duck) {
     const target = duck ? 0.2 : 0.4;
     gameGainNode.gain.setValueAtTime(gameGainNode.gain.value, now);
     gameGainNode.gain.linearRampToValueAtTime(target, now + 0.3);
+}
+
+resizeCanvas();
+startMenuBackground();
+if (musicEnabled) {
+    startMenuMusic();
 }

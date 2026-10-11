@@ -8,7 +8,7 @@
 body {
     overflow: hidden;
     background-color: #1a1a1a;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Segoe UI', 'Leelawadee UI', 'Leelawadee', Tahoma, Geneva, Verdana, sans-serif;
     color: white;
 }
 
@@ -1791,4 +1791,462 @@ h1 {
     margin-bottom: 20px;
     color: #ff4444;
     text-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
+}
+
+/* ============ 多人模式死亡畫面 ============ */
+#multiplayer-death-screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.death-modal {
+    background: linear-gradient(135deg, rgba(60, 20, 20, 0.95), rgba(20, 10, 10, 0.95));
+    border: 2px solid rgba(255, 68, 68, 0.6);
+    border-radius: 16px;
+    padding: 50px 60px;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(255, 0, 0, 0.3), inset 0 0 30px rgba(255, 68, 68, 0.1);
+    max-width: 500px;
+    animation: deathPulse 2s ease-in-out infinite;
+}
+
+@keyframes deathPulse {
+    0%, 100% { box-shadow: 0 0 50px rgba(255, 0, 0, 0.3), inset 0 0 30px rgba(255, 68, 68, 0.1); }
+    50% { box-shadow: 0 0 80px rgba(255, 0, 0, 0.5), inset 0 0 50px rgba(255, 68, 68, 0.2); }
+}
+
+.death-title {
+    font-size: 48px;
+    margin: 0 0 30px 0;
+    color: #ff4444;
+    text-shadow: 0 0 20px rgba(255, 68, 68, 0.8);
+    letter-spacing: 4px;
+}
+
+.death-stats {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+}
+
+.death-stat-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 68, 68, 0.3);
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 16px;
+    color: #ffaaaa;
+}
+
+.death-stat-item span {
+    color: #fff;
+    font-weight: bold;
+    font-size: 20px;
+    margin-left: 6px;
+}
+
+.respawn-info {
+    font-size: 22px;
+    color: #00ffff;
+    margin-bottom: 15px;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
+}
+
+#respawn-timer {
+    font-weight: bold;
+    font-size: 28px;
+    color: #00ffff;
+}
+
+.death-hint {
+    color: #888;
+    font-size: 13px;
+    margin: 0;
+    font-style: italic;
+}
+
+/* ============ 多人模式結果畫面 ============ */
+#multiplayer-result-screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.result-modal {
+    background: linear-gradient(135deg, rgba(20, 30, 60, 0.98), rgba(10, 15, 30, 0.98));
+    border: 2px solid rgba(0, 255, 255, 0.5);
+    border-radius: 20px;
+    padding: 40px 50px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 0 60px rgba(0, 255, 255, 0.25);
+}
+
+.result-title {
+    font-size: 42px;
+    text-align: center;
+    margin: 0 0 30px 0;
+    color: #00ffff;
+    text-shadow: 0 0 20px rgba(0, 255, 255, 0.7);
+    letter-spacing: 3px;
+}
+
+.result-summary {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.result-summary-item {
+    background: rgba(0, 255, 255, 0.08);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 20px 35px;
+    text-align: center;
+}
+
+.result-label {
+    font-size: 13px;
+    color: #88aacc;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+}
+
+.result-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #ffcc00;
+    text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+}
+
+.result-list-header,
+.result-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 100px 80px 80px;
+    gap: 10px;
+    padding: 12px 16px;
+    align-items: center;
+    font-size: 14px;
+}
+
+.result-list-header {
+    background: rgba(0, 255, 255, 0.1);
+    border-radius: 8px 8px 0 0;
+    color: #00ffff;
+    font-weight: bold;
+    border-bottom: 2px solid rgba(0, 255, 255, 0.3);
+    letter-spacing: 1px;
+}
+
+.result-list {
+    max-height: 250px;
+    overflow-y: auto;
+    border-radius: 0 0 8px 8px;
+    background: rgba(255, 255, 255, 0.02);
+    margin-bottom: 30px;
+}
+
+.result-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #cccccc;
+    transition: background 0.15s;
+}
+
+.result-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.result-row.result-self {
+    background: rgba(255, 204, 0, 0.08);
+    color: #fff;
+    border-left: 3px solid #ffcc00;
+}
+
+.result-rank {
+    font-weight: bold;
+    text-align: center;
+    font-size: 18px;
+}
+.result-row:nth-child(1) .result-rank { color: #ffd700; text-shadow: 0 0 6px #ffd700; }
+.result-row:nth-child(2) .result-rank { color: #c0c0c0; }
+.result-row:nth-child(3) .result-rank { color: #cd7f32; }
+
+.result-name {
+    font-weight: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.result-score {
+    text-align: right;
+    color: #00ffff;
+    font-weight: bold;
+}
+
+.result-kills, .result-level {
+    text-align: center;
+    font-size: 13px;
+}
+
+.result-actions {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+/* ============ 建立房間彈窗 ============ */
+.create-room-modal-content {
+    max-width: 620px;
+    width: 92%;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 20px;
+    margin-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cr-form-group {
+    margin-bottom: 24px;
+}
+
+.cr-form-group label {
+    display: block;
+    color: #00ffff;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+}
+
+.cr-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.cr-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 2px solid rgba(0, 255, 255, 0.25);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 15px;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cr-input:focus {
+    outline: none;
+    border-color: #00ffff;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.25);
+}
+
+.cr-mode-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.cr-mode-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px 12px 18px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.cr-mode-card:hover {
+    border-color: rgba(0, 255, 255, 0.5);
+    transform: translateY(-2px);
+}
+
+.cr-mode-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    top: 0; left: 0;
+}
+
+.cr-mode-card input[type="radio"]:checked ~ * {
+    color: #00ffff;
+}
+
+.cr-mode-card:has(input[type="radio"]:checked) {
+    border-color: #00ffff;
+    background: rgba(0, 255, 255, 0.08);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+}
+
+.cr-mode-icon {
+    font-size: 36px;
+    margin-bottom: 8px;
+}
+
+.cr-mode-name {
+    font-size: 15px;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 6px;
+}
+
+.cr-mode-desc {
+    font-size: 11px;
+    color: #888;
+    line-height: 1.4;
+}
+
+.cr-range {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    outline: none;
+}
+
+.cr-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #00ffff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
+    transition: transform 0.15s;
+}
+
+.cr-range::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.cr-range::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #00ffff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
+}
+
+/* ============ 波次 HUD ============ */
+#wave-hud {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: linear-gradient(135deg, rgba(20, 40, 80, 0.9), rgba(10, 20, 40, 0.9));
+    border: 2px solid rgba(0, 200, 255, 0.5);
+    border-radius: 12px;
+    padding: 12px 20px 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 0 20px rgba(0, 150, 255, 0.3);
+    z-index: 500;
+    animation: waveHudPulse 3s ease-in-out infinite;
+}
+
+@keyframes waveHudPulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(0, 150, 255, 0.3); }
+    50% { box-shadow: 0 0 35px rgba(0, 200, 255, 0.5); }
+}
+
+.wave-hud-icon {
+    font-size: 32px;
+    filter: drop-shadow(0 0 6px rgba(0, 200, 255, 0.8));
+}
+
+.wave-hud-label {
+    font-size: 11px;
+    color: #88bbdd;
+    letter-spacing: 2px;
+    margin-bottom: 2px;
+}
+
+.wave-hud-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 8px rgba(0, 200, 255, 0.8);
+}
+
+#wave-number {
+    color: #00ffff;
+}
+
+/* ============ 手機端響應式 ============ */
+@media (max-width: 768px) {
+    .death-modal {
+        padding: 35px 25px;
+        margin: 0 15px;
+    }
+    .death-title { font-size: 32px; }
+    .death-stats { gap: 10px; }
+    .death-stat-item { padding: 10px 12px; font-size: 13px; }
+    .death-stat-item span { font-size: 16px; }
+    .respawn-info { font-size: 18px; }
+    #respawn-timer { font-size: 22px; }
+
+    .result-modal { padding: 25px 20px; }
+    .result-title { font-size: 28px; }
+    .result-summary { flex-direction: column; gap: 12px; margin-bottom: 20px; }
+    .result-summary-item { padding: 14px 20px; }
+    .result-value { font-size: 24px; }
+    .result-list-header, .result-row {
+        grid-template-columns: 45px 1fr 70px 60px 55px;
+        gap: 6px;
+        padding: 10px 8px;
+        font-size: 12px;
+    }
+    .result-rank { font-size: 15px; }
+    .result-actions { flex-direction: column; gap: 10px; }
+    .result-actions .action-btn { width: 100%; }
+
+    .cr-mode-grid { grid-template-columns: 1fr; }
+    .cr-form-row { grid-template-columns: 1fr; gap: 12px; }
+    .cr-mode-desc { font-size: 12px; }
+
+    #wave-hud {
+        top: 60px;
+        right: 10px;
+        padding: 8px 14px 8px 10px;
+        gap: 8px;
+    }
+    .wave-hud-icon { font-size: 24px; }
+    .wave-hud-value { font-size: 15px; }
+}
+
+@media (max-width: 480px) {
+    .death-title { font-size: 26px; letter-spacing: 2px; }
+    .result-title { font-size: 24px; letter-spacing: 2px; }
 }

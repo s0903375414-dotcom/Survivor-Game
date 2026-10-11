@@ -13,17 +13,6 @@
     <link rel="apple-touch-icon" href="assets/commander_tutorial.jpg">
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    
-    <!-- Firebase SDK (8.x 版本，較穩定相容性好) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    
-    <!-- 載入 Firebase 設定 (請建立 firebase-config.js 填入您的設定) -->
-    <script src="firebase-config.js" onerror="console.warn('找不到 firebase-config.js，將使用本地模式')"></script>
-    
-    <!-- 新的資料管理員 -->
-    <script src="data-manager.js"></script>
 </head>
 <body>
     <div id="ui-layer">
@@ -454,6 +443,17 @@
                     </div>
 
                     <div class="settings-section">
+                        <h3><span class="icon">🌐</span> <span data-lang-label>語言</span></h3>
+                        <div class="setting-item">
+                            <label>語言</label>
+                            <select id="setting-language">
+                                <option value="zh">繁體中文</option>
+                                <option value="th">ไทย (Thai)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
                         <h3><span class="icon">✨</span> 畫面效能</h3>
                         <div class="setting-item">
                             <label>粒子特效等級</label>
@@ -724,9 +724,141 @@
             </div>
             <div id="mobile-skill-btn">🚀</div>
         </div>
+
+        <!-- 多人模式陣亡畫面 -->
+        <div id="multiplayer-death-screen" class="hidden">
+            <div class="death-modal">
+                <h1 class="death-title">💀 指揮官陣亡</h1>
+                <div class="death-stats">
+                    <div class="death-stat-item">當前得分: <span id="death-score">0</span></div>
+                    <div class="death-stat-item">擊殺數: <span id="death-kills">0</span></div>
+                    <div class="death-stat-item">等級: <span id="death-level">1</span></div>
+                </div>
+                <div class="respawn-info">自動復活倒數 <span id="respawn-timer">10.0s</span></div>
+                <p class="death-hint">提示：全隊陣亡時任務失敗</p>
+            </div>
+        </div>
+
+        <!-- 多人模式遊戲結束畫面 -->
+        <div id="multiplayer-result-screen" class="hidden">
+            <div class="result-modal">
+                <h1 class="result-title">🏁 任務結算</h1>
+                <div class="result-summary">
+                    <div class="result-summary-item">
+                        <div class="result-label">本次得分</div>
+                        <div class="result-value" id="multiplayer-result-score">0</div>
+                    </div>
+                    <div class="result-summary-item">
+                        <div class="result-label">獲得軍資</div>
+                        <div class="result-value" id="multiplayer-result-funds">0</div>
+                    </div>
+                </div>
+                <div class="result-list-header">
+                    <div class="result-rank">名次</div>
+                    <div class="result-name">指揮官</div>
+                    <div class="result-score">得分</div>
+                    <div class="result-kills">擊殺</div>
+                    <div class="result-level">等級</div>
+                </div>
+                <div id="multiplayer-result-list" class="result-list"></div>
+                <div class="result-actions">
+                    <button id="mp-result-replay" class="action-btn unit-btn">再試一次</button>
+                    <button id="mp-result-menu" class="action-btn endless-btn">返回選單</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 建立新房間彈窗 -->
+        <div id="create-room-modal" class="modal hidden">
+            <div class="modal-content create-room-modal-content">
+                <div class="modal-header">
+                    <h2>建立戰術房間</h2>
+                    <button id="cr-cancel-top" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="cr-form-group">
+                        <label>房間代號</label>
+                        <input type="text" id="cr-room-name" class="cr-input" maxlength="20" />
+                    </div>
+                    <div class="cr-form-group">
+                        <label>作戰模式</label>
+                        <div class="cr-mode-grid">
+                            <label class="cr-mode-card">
+                                <input type="radio" name="cr-game-mode" value="survival" checked />
+                                <div class="cr-mode-icon">♾️</div>
+                                <div class="cr-mode-name">生存模式</div>
+                                <div class="cr-mode-desc">無盡戰場，考驗持久力</div>
+                            </label>
+                            <label class="cr-mode-card">
+                                <input type="radio" name="cr-game-mode" value="wave" />
+                                <div class="cr-mode-icon">🌊</div>
+                                <div class="cr-mode-name">波次模式</div>
+                                <div class="cr-mode-desc">逐波推進，擊破所有敵人</div>
+                            </label>
+                            <label class="cr-mode-card">
+                                <input type="radio" name="cr-game-mode" value="boss" />
+                                <div class="cr-mode-icon">👹</div>
+                                <div class="cr-mode-name">BOSS 挑戰</div>
+                                <div class="cr-mode-desc">要塞級 BOSS 常駐出沒</div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="cr-form-row">
+                        <div class="cr-form-group">
+                            <label>最大人數: <span id="cr-max-label">4</span> 人</label>
+                            <input type="range" id="cr-max-players" min="2" max="8" value="4" class="cr-range" />
+                        </div>
+                        <div class="cr-form-group">
+                            <label>難度倍率: <span id="cr-diff-label">1.0</span>x</label>
+                            <input type="range" id="cr-difficulty" min="0.2" max="5" step="0.1" value="1" class="cr-range" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cr-cancel-btn" class="action-btn endless-btn">取消</button>
+                    <button id="cr-confirm-btn" class="action-btn unit-btn">建立並加入</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 波次模式 HUD -->
+        <div id="wave-hud" class="hidden">
+            <div class="wave-hud-icon">🌊</div>
+            <div class="wave-hud-text">
+                <div class="wave-hud-label">當前波次</div>
+                <div class="wave-hud-value">第 <span id="wave-number">1</span> 波</div>
+            </div>
+        </div>
     </div>
     <canvas id="gameCanvas"></canvas>
     <script src="shared_config.js"></script>
-    <script src="game.js?v=9"></script>
+    <script src="i18n.js"></script>
+    <script src="i18n_dict_1.js"></script>
+    <script src="i18n_dict_2.js"></script>
+    <script src="i18n_dict_3.js"></script>
+    <script src="i18n_dict_4.js"></script>
+    <script src="character.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const maxRange = document.getElementById('cr-max-players');
+            const maxLabel = document.getElementById('cr-max-label');
+            if (maxRange && maxLabel) {
+                maxRange.addEventListener('input', () => { maxLabel.textContent = maxRange.value; });
+            }
+            const diffRange = document.getElementById('cr-difficulty');
+            const diffLabel = document.getElementById('cr-diff-label');
+            if (diffRange && diffLabel) {
+                diffRange.addEventListener('input', () => { diffLabel.textContent = parseFloat(diffRange.value).toFixed(1); });
+            }
+            const crCancelTop = document.getElementById('cr-cancel-top');
+            if (crCancelTop) {
+                crCancelTop.addEventListener('click', () => {
+                    const m = document.getElementById('create-room-modal');
+                    if (m) m.classList.add('hidden');
+                });
+            }
+        });
+    </script>
+    <script src="game.js?v=10"></script>
 </body>
 </html>
