@@ -12,6 +12,20 @@ body {
     color: white;
 }
 
+/* 星輝抽卡:稀有度配色與角色項目樣式 */
+.gacha-item {
+    display: inline-block;
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 6px;
+    margin: 2px;
+    background: rgba(255, 255, 255, 0.04);
+}
+.rarity-N { color: #b8c7d6; }
+.rarity-R { color: #4aa3ff; }
+.rarity-SR { color: #c07bff; }
+.rarity-SSR { color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
+
 #gameCanvas {
     display: block;
     width: 100vw;

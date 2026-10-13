@@ -395,6 +395,7 @@
                         <span class="icon">🌐</span> 多人連線 (ALPHA)
                     </button>
                     <div class="bottom-row">
+                        <button id="gacha-btn" class="action-btn unit-btn">角色抽卡</button>
                         <button id="unit-config-btn" class="action-btn unit-btn">單位配置</button>
                         <button id="settings-trigger-btn" class="action-btn settings-btn">系統設定</button>
                     </div>
@@ -639,6 +640,27 @@
             </div>
         </div>
 
+        <div id="gacha-modal" class="modal hidden">
+            <div class="modal-content unit-modal-content">
+                <div class="modal-header">
+                    <h2>角色抽卡</h2>
+                    <button id="gacha-close-btn" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body unit-modal-body">
+                    <div class="unit-header-row">
+                        <div class="unit-header-title">以星輝召喚角色，擊殺 Boss 可獲得星輝</div>
+                        <div class="unit-header-funds">星輝餘額：<span id="gacha-balance" style="color:#ffd700;">0</span></div>
+                    </div>
+                    <div style="text-align:center; margin:10px 0;">
+                        <button id="gacha-pull-btn" class="action-btn endless-btn">單抽（10 星輝）</button>
+                    </div>
+                    <div id="gacha-result" style="text-align:center; font-size:1.15em; min-height:34px; margin-bottom:8px;"></div>
+                    <p class="modal-tip">我的倉庫（最近 8 隻）</p>
+                    <div id="gacha-warehouse" style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center; max-height:170px; overflow-y:auto;"></div>
+                </div>
+            </div>
+        </div>
+
         <div id="unit-modal" class="modal hidden">
             <div class="modal-content unit-modal-content">
                 <div class="modal-header">
@@ -838,6 +860,7 @@
     <script src="i18n_dict_3.js"></script>
     <script src="i18n_dict_4.js"></script>
     <script src="character.js"></script>
+    <script src="gacha.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const maxRange = document.getElementById('cr-max-players');

@@ -1586,6 +1586,7 @@ function recordScoreToLeaderboard(finalScore) {
 
 function loadMetaProgress() {
     const prefix = currentUser ? `_${currentUser.username}` : '';
+    loadGachaState(); // 星輝/倉庫/日誌與其他進度一併載入
     
     // Dev account special case
     if (currentUser && currentUser.username === t('開發團隊')) {
@@ -1760,6 +1761,86 @@ function saveMetaProgress() {
     localStorage.setItem(`survivor_units_owned${prefix}`, JSON.stringify(ownedUnits));
     localStorage.setItem(`survivor_units_equipped${prefix}`, JSON.stringify(equippedUnits));
 }
+
+// ===== 星輝(鑽石)角色抽卡系統:玩家資料持久化 + 面板接線 =====
+var gachaState = { diamond: 0, warehouse: [], logs: [] };
+
+function gachaStoreKey(suffix) {
+    const prefix = currentUser ? `_${currentUser.username}` : '';
+    return `survivor_${suffix}${prefix}`;
+}
+
+function loadGachaState() {
+    // 開發帳號:直接給 9999 星輝方便測試抽卡
+    if (currentUser && currentUser.username === t('開發團隊')) {
+        gachaState = { diamond: 9999, warehouse: [], logs: [] };
+        return;
+    }
+    gachaState = { diamond: 0, warehouse: [], logs: [] };
+    try { const d = parseInt(localStorage.getItem(gachaStoreKey('xinghui')), 10); if (!isNaN(d)) gachaState.diamond = d; } catch (e) { /* ignore */ }
+    try { const w = JSON.parse(localStorage.getItem(gachaStoreKey('warehouse'))); if (Array.isArray(w)) gachaState.warehouse = w; } catch (e) { /* ignore */ }
+    try { const l = JSON.parse(localStorage.getItem(gachaStoreKey('xinghui_logs'))); if (Array.isArray(l)) gachaState.logs = l; } catch (e) { /* ignore */ }
+}
+
+function saveGachaState() {
+    try {
+        localStorage.setItem(gachaStoreKey('xinghui'), String(gachaState.diamond));
+        localStorage.setItem(gachaStoreKey('warehouse'), JSON.stringify(gachaState.warehouse));
+        localStorage.setItem(gachaStoreKey('xinghui_logs'), JSON.stringify(gachaState.logs));
+    } catch (e) { /* localStorage 不可用時忽略 */ }
+}
+
+// --- 抽卡面板 UI ---
+const gachaModal = document.getElementById('gacha-modal');
+const gachaOpenBtn = document.getElementById('gacha-btn');
+const gachaCloseBtn = document.getElementById('gacha-close-btn');
+const gachaBalanceEl = document.getElementById('gacha-balance');
+const gachaPullBtn = document.getElementById('gacha-pull-btn');
+const gachaResultEl = document.getElementById('gacha-result');
+const gachaWarehouseEl = document.getElementById('gacha-warehouse');
+
+function renderGachaPanel() {
+    if (!gachaModal || typeof GachaSystem === 'undefined') return;
+    if (gachaBalanceEl) gachaBalanceEl.textContent = String(GachaSystem.getBalance(gachaState));
+    if (gachaPullBtn) gachaPullBtn.textContent = tf('單抽（{cost} 星輝）', { cost: GachaSystem.GACHA_CONFIG.costPerPull });
+    if (gachaWarehouseEl) {
+        const items = gachaState.warehouse.slice(-8).reverse().map(function (c) {
+            return '<span class="gacha-item rarity-' + c.rarity + '">' + t(c.name) + ' <small>[' + c.rarity + ']</small></span>';
+        }).join('');
+        gachaWarehouseEl.innerHTML = items || '<span style="opacity:.5">' + t('尚無角色，擊殺 Boss 取得星輝後即可抽卡') + '</span>';
+    }
+}
+
+function openGachaPanel() {
+    if (!gachaModal || typeof GachaSystem === 'undefined') return;
+    if (gachaResultEl) gachaResultEl.innerHTML = '';
+    renderGachaPanel();
+    gachaModal.classList.remove('hidden');
+}
+
+function doGachaPull() {
+    if (typeof GachaSystem === 'undefined') return;
+    const result = GachaSystem.tryPull(gachaState);
+    if (!result.ok) {
+        if (result.error === 'insufficient') {
+            // 星輝(鑽石)餘額不足 → 即時彈窗提醒
+            alert(tf('星輝不足，無法抽卡！單抽需要 {cost} 顆，目前餘額 {balance} 顆。擊殺 Boss 可獲得星輝。', { cost: GachaSystem.GACHA_CONFIG.costPerPull, balance: result.balance }));
+        } else {
+            alert(t('抽卡失敗，請稍後再試。'));
+        }
+        return;
+    }
+    saveGachaState(); // 原子操作成功後持久化(餘額 + 倉庫 + 日誌)
+    playSound('levelup');
+    if (gachaResultEl) {
+        gachaResultEl.innerHTML = '<span class="gacha-item rarity-' + result.rarity + '">' + tf('獲得角色：{name}（{rarity}）', { name: t(result.character.name), rarity: result.rarity }) + '</span>';
+    }
+    renderGachaPanel();
+}
+
+if (gachaOpenBtn) gachaOpenBtn.addEventListener('click', openGachaPanel);
+if (gachaCloseBtn) gachaCloseBtn.addEventListener('click', () => { if (gachaModal) gachaModal.classList.add('hidden'); });
+if (gachaPullBtn) gachaPullBtn.addEventListener('click', doGachaPull);
 
 function applyEquippedUnits() {
     fundsGainMultiplier = 1;
@@ -3065,7 +3146,7 @@ class Player {
         this.level = 1;
         this.xp = 0;
         this.xpToNextLevel = 100;
-        this.diamond = 0;  // 新增: 鑽石資源
+        this.diamond = (typeof GachaSystem !== 'undefined') ? GachaSystem.getBalance(gachaState) : 0;  // 星輝餘額即時讀取
         this.lastShotTime = 0;
         // === 可互動角色系統:動畫狀態機 ===
         this.anim = new CharacterAnim();
@@ -4465,10 +4546,15 @@ function animate() {
                     score += 10;
                     totalKills += 1; // Increment total kills
                     
-                    // Diamond reward for Boss kill
-                    if (enemy.isBoss) {
-                        player.diamond += 10;
-                        showNotification(t('diamond_drop', {count: 10}));
+                    // 星輝獎勵:擊殺 Boss 掉落 10 顆(同步更新玩家資料 + 掉落日誌)
+                    if (enemy.isBoss && typeof GachaSystem !== 'undefined') {
+                        const bossName = enemy.type || 'BOSS';
+                        const reward = GachaSystem.grantBossReward(gachaState, bossName);
+                        if (reward.ok) {
+                            saveGachaState();
+                            player.diamond = GachaSystem.getBalance(gachaState); // 戰局內即時同步
+                            showNotification(tf('擊殺 {boss}，獲得 {count} 顆星輝！', { boss: bossName, count: reward.reward }));
+                        }
                     }
                     
                     scoreDisplay.textContent = score;
