@@ -1840,7 +1840,7 @@ function renderGachaWarehouse() {
         return ra - rb || (b.count || 1) - (a.count || 1);
     });
     const items = list.map(function (c) {
-        return '<div class="gacha-own-card rarity-' + c.rarity + '">' + gachaPortraitHTML(c.id, 2)
+        return '<div class="gacha-own-card rarity-' + c.rarity + '" data-char-id="' + c.id + '">' + gachaPortraitHTML(c.id, 2)
             + '<div class="gacha-own-name">' + t(c.name) + '</div>'
             + '<div class="gacha-own-rarity">' + c.rarity + ((c.count || 1) > 1 ? ' ×' + c.count : '') + '</div>'
             + '</div>';
@@ -1914,6 +1914,7 @@ function renderGachaResults(results) {
         const card = document.createElement('div');
         const delay = Math.min(i * 110, 1210);
         card.className = 'gacha-card rarity-' + r.rarity + ((r.rarity === 'SSR') ? ' ssr-card' : '');
+        card.dataset.charId = r.char.id;
         card.style.animationDelay = delay + 'ms';
         if (delay > maxDelay) maxDelay = delay;
         let badges = r.isNew
@@ -1973,6 +1974,62 @@ if (gachaPullBtn) gachaPullBtn.addEventListener('click', () => doGachaPull(gacha
 if (gachaPull10Btn) gachaPull10Btn.addEventListener('click', () => doGachaPull(gachaActiveBanner, 10));
 if (gachaTabStandardEl) gachaTabStandardEl.addEventListener('click', () => selectGachaBanner('standard'));
 if (gachaTabLimitedEl) gachaTabLimitedEl.addEventListener('click', () => selectGachaBanner('limited'));
+
+// --- 角色詳情面板(放大立繪 / 屬性條 / 專屬技能 / 原創背景故事 / 招牌台詞) ---
+const charDetailModal = document.getElementById('char-detail-modal');
+const charDetailNameEl = document.getElementById('char-detail-name');
+const charDetailPortraitEl = document.getElementById('char-detail-portrait');
+const charDetailRarityEl = document.getElementById('char-detail-rarity');
+const charDetailStatsEl = document.getElementById('char-detail-stats');
+const charDetailSkillEl = document.getElementById('char-detail-skill');
+const charDetailStoryEl = document.getElementById('char-detail-story');
+const charDetailTaglineEl = document.getElementById('char-detail-tagline');
+const charDetailCloseBtn = document.getElementById('char-detail-close-btn');
+
+const CHAR_STAT_MAX = { hp: 100, atk: 20, def: 12, spd: 120 };
+const CHAR_STAT_LABELS = { hp: '生命', atk: '攻擊', def: '防禦', spd: '速度' };
+
+function openCharDetail(charId) {
+    if (typeof CHAR_BY_ID === 'undefined' || !charDetailModal) return;
+    const ch = CHAR_BY_ID[charId];
+    if (!ch) return;
+    if (charDetailNameEl) charDetailNameEl.textContent = t(ch.name);
+    if (charDetailPortraitEl) charDetailPortraitEl.innerHTML = gachaPortraitHTML(ch.id, 5);
+    if (charDetailRarityEl) {
+        charDetailRarityEl.textContent = ch.rarity;
+        charDetailRarityEl.className = 'char-detail-rarity rarity-' + ch.rarity;
+    }
+    if (charDetailStatsEl) {
+        charDetailStatsEl.innerHTML = ['hp', 'atk', 'def', 'spd'].map(function (k) {
+            const v = ch.stats[k] || 0, max = CHAR_STAT_MAX[k] || 100;
+            const pct = Math.max(4, Math.min(100, Math.round(v / max * 100)));
+            return '<div class="char-stat-row"><span class="char-stat-label">' + t(CHAR_STAT_LABELS[k]) + '</span>'
+                + '<div class="char-stat-track"><div class="char-stat-fill" style="width:' + pct + '%"></div></div>'
+                + '<span class="char-stat-value">' + v + '</span></div>';
+        }).join('');
+    }
+    if (charDetailSkillEl) {
+        charDetailSkillEl.innerHTML = '<div class="char-detail-section-title">' + t('專屬技能') + '：' + t(ch.skill.name) + '</div>'
+            + '<div class="char-skill-desc">' + t(ch.skill.desc) + '</div>';
+    }
+    if (charDetailStoryEl) {
+        charDetailStoryEl.innerHTML = '<div class="char-detail-section-title">' + t('原創背景故事') + '</div>'
+            + '<p class="char-story-text">' + t(ch.story) + '</p>';
+    }
+    if (charDetailTaglineEl) charDetailTaglineEl.textContent = '『' + t(ch.tagline) + '』';
+    charDetailModal.classList.remove('hidden');
+}
+
+if (charDetailCloseBtn) charDetailCloseBtn.addEventListener('click', () => { if (charDetailModal) charDetailModal.classList.add('hidden'); });
+if (charDetailModal) charDetailModal.addEventListener('click', (e) => { if (e.target === charDetailModal) charDetailModal.classList.add('hidden'); });
+if (gachaWarehouseEl) gachaWarehouseEl.addEventListener('click', (e) => {
+    const card = e.target.closest('.gacha-own-card');
+    if (card && card.dataset.charId) openCharDetail(card.dataset.charId);
+});
+if (gachaResultEl) gachaResultEl.addEventListener('click', (e) => {
+    const card = e.target.closest('.gacha-card');
+    if (card && card.dataset.charId) openCharDetail(card.dataset.charId);
+});
 
 function applyEquippedUnits() {
     fundsGainMultiplier = 1;

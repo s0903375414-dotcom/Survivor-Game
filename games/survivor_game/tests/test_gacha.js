@@ -23,7 +23,8 @@ console.log('=== 角色資料庫完整性 ===');
     check('稀有度皆為 N/R/SR/SSR', DB.every(c => ['N', 'R', 'SR', 'SSR'].includes(c.rarity)));
     check('屬性面板齊全(hp/atk/def/spd 皆正數)', DB.every(c => c.stats && [c.stats.hp, c.stats.atk, c.stats.def, c.stats.spd].every(v => typeof v === 'number' && v > 0)));
     check('專屬技能齊全(名稱+描述)', DB.every(c => c.skill && c.skill.name && c.skill.desc));
-    check('背景故事與招牌台詞齊全', DB.every(c => typeof c.story === 'string' && c.story.length >= 10 && typeof c.tagline === 'string' && c.tagline.length > 0));
+    check('原創背景故事完整(每位 ≥40 字)與招牌台詞齊全', DB.every(c => typeof c.story === 'string' && c.story.length >= 40 && typeof c.tagline === 'string' && c.tagline.length > 0));
+    check('背景故事皆為獨立撰寫(無重複)', new Set(DB.map(c => c.story)).size === 17);
     check('立繪配色與髮型規格齊全', DB.every(c => c.palette && c.palette.hair && c.palette.hairDark && c.palette.eye && c.palette.outfit && c.hairStyle));
     const bySrc = {}; DB.forEach(c => { bySrc[c.source] = (bySrc[c.source] || 0) + 1; });
     check('二創來源《魔法少女的魔女審判》6 位', bySrc.manosaba === 6, JSON.stringify(bySrc));
@@ -146,7 +147,7 @@ console.log('=== 場景集成測試:擊殺 Boss → 抽卡 完整流程 ===');
         s.logs.filter(l => l.reason === 'boss_kill:BOSS').length === 2 &&
         s.logs.filter(l => l.type === 'gacha_pull').length === 2);
     G.grantBossReward(s, 'BOSS');
-    const p3 = G.tryPull(s);
+    const p3 = G.tryPull(s, () => 0.85); // 固定 R 區間且必為新角色(與前兩抽不同) → 無重複轉換,餘額精確歸零
     check('再擊殺 Boss 後可再抽(0→10→0)', p3.ok && s.diamond === 0);
 })();
 

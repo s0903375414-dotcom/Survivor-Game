@@ -2302,3 +2302,21 @@ h1 {
 @keyframes gachaCardIn { from { opacity: 0; transform: translateY(18px) scale(.6) rotate(4deg); } to { opacity: 1; transform: none; } }
 @keyframes gachaSSRpulse { 0%, 100% { transform: none; } 35% { transform: scale(1.12); } 60% { transform: scale(.97); } }
 @keyframes gachaFlash { from { opacity: 1; } to { opacity: 0; } }
+
+/* ===== 角色詳情面板(原創背景故事檢視) ===== */
+.char-detail-content { max-width: 430px; }
+.char-detail-body { text-align: center; padding: 12px 20px 20px; }
+.char-detail-portrait img { width: 96px; height: 120px; image-rendering: pixelated; margin: 4px auto 2px; }
+.char-detail-rarity { font-size: .8em; letter-spacing: 3px; margin-bottom: 10px; }
+.char-stat-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.char-stat-label { width: 38px; text-align: right; font-size: .8em; color: #aab4c4; }
+.char-stat-track { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,.1); overflow: hidden; }
+.char-stat-fill { height: 100%; background: linear-gradient(90deg, #4aa3ff, #c07bff); border-radius: 4px; }
+.char-stat-value { width: 32px; font-size: .8em; text-align: left; }
+.char-detail-section-title { margin-top: 14px; font-size: .82em; color: #8fb8cf; text-align: left; border-left: 3px solid #a78bfa; padding-left: 8px; }
+.char-skill-desc { text-align: left; font-size: .85em; margin-top: 4px; color: #e2e8f0; line-height: 1.6; }
+.char-story-text { text-align: left; font-size: .85em; line-height: 1.85; margin: 6px 0 0; color: #e2e8f0; }
+.char-detail-tagline { margin-top: 14px; font-size: .92em; color: #ffd700; }
+.gacha-own-card { cursor: pointer; transition: transform .15s, border-color .15s; }
+.gacha-own-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,.55); }
+.gacha-card { cursor: pointer; }
