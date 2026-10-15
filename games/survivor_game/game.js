@@ -903,8 +903,17 @@ function showAuthView(viewName) {
     else if (viewName === 'migration' && authViewMigration) authViewMigration.classList.remove('hidden');
 }
 
+// ===== 開發人員名單:阿奇(archie)、滷蛋 =====
+var DEV_TEAM_ALIASES = ['阿奇', 'archie', 'Archie', '滷蛋'];
+function isDevAccount(user) {
+    const u = user || currentUser;
+    if (!u) return false;
+    if (u.isAdmin) return true;
+    return u.username === t('開發團隊') || DEV_TEAM_ALIASES.indexOf(u.username) !== -1;
+}
+
 function isUsernameTaken(username) {
-    if (['Dev',t('開發人員'),'Developer','Admin',t('開發團隊')].includes(username)) return true;
+    if (['Dev',t('開發人員'),'Developer','Admin',t('開發團隊')].concat(DEV_TEAM_ALIASES).includes(username)) return true;
     
     const accountsRaw = localStorage.getItem('survivor_accounts');
     const oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
@@ -1043,6 +1052,14 @@ function handleBtnSubmitLogin() {
     
     if (emailOrOldId === 'Dev' || emailOrOldId === t('開發人員') || emailOrOldId === 'Developer' || emailOrOldId === 'Admin') {
         currentUser = { username: t('開發團隊'), uid: 'DEV_001', isAdmin: true };
+        completeLoginFlow();
+        return;
+    }
+    // 開發人員名單:阿奇(archie)、滷蛋 — 以代號登入即取得開發權限(各自保有代號顯示)
+    const devMemberUid = { '阿奇': 'DEV_ARCHIE', 'archie': 'DEV_ARCHIE', 'Archie': 'DEV_ARCHIE', '滷蛋': 'DEV_LUDAN' }[emailOrOldId];
+    if (devMemberUid) {
+        const devName = (emailOrOldId === 'archie' || emailOrOldId === 'Archie') ? '阿奇' : emailOrOldId;
+        currentUser = { username: devName, uid: devMemberUid, isAdmin: true };
         completeLoginFlow();
         return;
     }
@@ -1589,7 +1606,7 @@ function loadMetaProgress() {
     loadGachaState(); // 星輝/倉庫/日誌與其他進度一併載入
     
     // Dev account special case
-    if (currentUser && currentUser.username === t('開發團隊')) {
+    if (isDevAccount()) {
         militaryFunds = 9999999;
         ownedUnits = {};
         equippedUnits = {};
@@ -1773,7 +1790,7 @@ function gachaStoreKey(suffix) {
 
 function loadGachaState() {
     // 開發帳號:直接給 9999 星輝 + 99 召喚券方便測試抽卡
-    if (currentUser && currentUser.username === t('開發團隊')) {
+    if (isDevAccount()) {
         gachaState = { diamond: 9999, tickets: 99, warehouse: [], logs: [], pity: {} };
         return;
     }

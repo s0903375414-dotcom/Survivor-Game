@@ -2320,3 +2320,8 @@ h1 {
 .gacha-own-card { cursor: pointer; transition: transform .15s, border-color .15s; }
 .gacha-own-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,.55); }
 .gacha-card { cursor: pointer; }
+
+/* ===== 開發人員名單 ===== */
+.dev-team-list { display: flex; gap: 10px; flex-wrap: wrap; padding: 4px 0; }
+.dev-member { padding: 6px 14px; border: 1px solid rgba(167,139,250,.4); border-radius: 16px; background: rgba(167,139,250,.08); font-size: .92em; }
+.dev-member small { opacity: .65; }
