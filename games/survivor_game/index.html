@@ -649,14 +649,20 @@
                 <div class="modal-body unit-modal-body">
                     <div class="unit-header-row">
                         <div class="unit-header-title">以星輝召喚角色，擊殺 Boss 可獲得星輝</div>
-                        <div class="unit-header-funds">星輝餘額：<span id="gacha-balance" style="color:#ffd700;">0</span></div>
+                        <div class="unit-header-funds">星輝餘額：<span id="gacha-balance" style="color:#ffd700;">0</span>｜召喚券：<span id="gacha-tickets" style="color:#7ee787;">0</span></div>
                     </div>
-                    <div style="text-align:center; margin:10px 0;">
+                    <div class="gacha-tabs">
+                        <button id="gacha-tab-standard" class="gacha-tab active">常駐卡池</button>
+                        <button id="gacha-tab-limited" class="gacha-tab">限定卡池</button>
+                    </div>
+                    <div id="gacha-banner-info" class="gacha-banner-info"></div>
+                    <div class="gacha-actions">
                         <button id="gacha-pull-btn" class="action-btn endless-btn">單抽（10 星輝）</button>
+                        <button id="gacha-pull10-btn" class="action-btn endless-btn">十連</button>
                     </div>
-                    <div id="gacha-result" style="text-align:center; font-size:1.15em; min-height:34px; margin-bottom:8px;"></div>
-                    <p class="modal-tip">我的倉庫（最近 8 隻）</p>
-                    <div id="gacha-warehouse" style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center; max-height:170px; overflow-y:auto;"></div>
+                    <div id="gacha-result" class="gacha-result"></div>
+                    <p class="modal-tip">我的倉庫</p>
+                    <div id="gacha-warehouse" class="gacha-warehouse"></div>
                 </div>
             </div>
         </div>
@@ -860,6 +866,7 @@
     <script src="i18n_dict_3.js"></script>
     <script src="i18n_dict_4.js"></script>
     <script src="character.js"></script>
+    <script src="characters_data.js"></script>
     <script src="gacha.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {

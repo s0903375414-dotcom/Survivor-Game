@@ -1763,7 +1763,8 @@ function saveMetaProgress() {
 }
 
 // ===== 星輝(鑽石)角色抽卡系統:玩家資料持久化 + 面板接線 =====
-var gachaState = { diamond: 0, warehouse: [], logs: [] };
+var gachaState = { diamond: 0, tickets: 0, warehouse: [], logs: [], pity: {} };
+var gachaActiveBanner = 'standard'; // 'standard' | 'limited'
 
 function gachaStoreKey(suffix) {
     const prefix = currentUser ? `_${currentUser.username}` : '';
@@ -1771,44 +1772,123 @@ function gachaStoreKey(suffix) {
 }
 
 function loadGachaState() {
-    // 開發帳號:直接給 9999 星輝方便測試抽卡
+    // 開發帳號:直接給 9999 星輝 + 99 召喚券方便測試抽卡
     if (currentUser && currentUser.username === t('開發團隊')) {
-        gachaState = { diamond: 9999, warehouse: [], logs: [] };
+        gachaState = { diamond: 9999, tickets: 99, warehouse: [], logs: [], pity: {} };
         return;
     }
-    gachaState = { diamond: 0, warehouse: [], logs: [] };
-    try { const d = parseInt(localStorage.getItem(gachaStoreKey('xinghui')), 10); if (!isNaN(d)) gachaState.diamond = d; } catch (e) { /* ignore */ }
-    try { const w = JSON.parse(localStorage.getItem(gachaStoreKey('warehouse'))); if (Array.isArray(w)) gachaState.warehouse = w; } catch (e) { /* ignore */ }
+    gachaState = { diamond: 0, tickets: 0, warehouse: [], logs: [], pity: {} };
+    let hadSave = false;
+    try { const d = parseInt(localStorage.getItem(gachaStoreKey('xinghui')), 10); if (!isNaN(d)) { gachaState.diamond = d; hadSave = true; } } catch (e) { /* ignore */ }
+    try { const w = JSON.parse(localStorage.getItem(gachaStoreKey('warehouse'))); if (Array.isArray(w)) { gachaState.warehouse = w; hadSave = true; } } catch (e) { /* ignore */ }
     try { const l = JSON.parse(localStorage.getItem(gachaStoreKey('xinghui_logs'))); if (Array.isArray(l)) gachaState.logs = l; } catch (e) { /* ignore */ }
+    try { const tk = parseInt(localStorage.getItem(gachaStoreKey('tickets')), 10); if (!isNaN(tk)) gachaState.tickets = tk; } catch (e) { /* ignore */ }
+    try { const p = JSON.parse(localStorage.getItem(gachaStoreKey('pity'))); if (p && typeof p === 'object') gachaState.pity = p; } catch (e) { /* ignore */ }
+    try { if (localStorage.getItem(gachaStoreKey('gacha_init'))) hadSave = true; } catch (e) { /* ignore */ }
+    // 首次進入遊戲:贈送新手召喚券(starterTickets)
+    if (!hadSave && typeof GachaSystem !== 'undefined' && GachaSystem.GACHA_CONFIG.starterTickets > 0) {
+        gachaState.tickets = GachaSystem.GACHA_CONFIG.starterTickets;
+        try { localStorage.setItem(gachaStoreKey('gacha_init'), '1'); } catch (e) { /* ignore */ }
+        saveGachaState();
+    }
 }
 
 function saveGachaState() {
     try {
         localStorage.setItem(gachaStoreKey('xinghui'), String(gachaState.diamond));
+        localStorage.setItem(gachaStoreKey('tickets'), String(gachaState.tickets));
         localStorage.setItem(gachaStoreKey('warehouse'), JSON.stringify(gachaState.warehouse));
         localStorage.setItem(gachaStoreKey('xinghui_logs'), JSON.stringify(gachaState.logs));
+        localStorage.setItem(gachaStoreKey('pity'), JSON.stringify(gachaState.pity));
     } catch (e) { /* localStorage 不可用時忽略 */ }
 }
 
-// --- 抽卡面板 UI ---
+// --- 抽卡面板 UI(卡池 v2:常駐/限定分頁、十連、保底進度、動畫結果卡、倉庫) ---
 const gachaModal = document.getElementById('gacha-modal');
 const gachaOpenBtn = document.getElementById('gacha-btn');
 const gachaCloseBtn = document.getElementById('gacha-close-btn');
 const gachaBalanceEl = document.getElementById('gacha-balance');
+const gachaTicketsEl = document.getElementById('gacha-tickets');
 const gachaPullBtn = document.getElementById('gacha-pull-btn');
+const gachaPull10Btn = document.getElementById('gacha-pull10-btn');
 const gachaResultEl = document.getElementById('gacha-result');
 const gachaWarehouseEl = document.getElementById('gacha-warehouse');
+const gachaBannerInfoEl = document.getElementById('gacha-banner-info');
+const gachaTabStandardEl = document.getElementById('gacha-tab-standard');
+const gachaTabLimitedEl = document.getElementById('gacha-tab-limited');
+
+const GACHA_RARITY_ORDER = { SSR: 0, SR: 1, R: 2, N: 3 };
+
+function gachaPortraitHTML(charId, scale) {
+    if (typeof GachaPortraits === 'undefined' || !charId) return '';
+    try {
+        const url = GachaPortraits.dataURL(charId, scale || 3);
+        return url ? '<img class="gacha-card-img" src="' + url + '" alt="">' : '';
+    } catch (e) { return ''; }
+}
+
+function currentGachaBanner() {
+    if (gachaActiveBanner === 'limited') return GachaSystem.activeLimitedBanner();
+    return GachaSystem.getBanner('standard');
+}
+
+function renderGachaWarehouse() {
+    if (!gachaWarehouseEl) return;
+    const list = gachaState.warehouse.slice().sort(function (a, b) {
+        const ra = (GACHA_RARITY_ORDER[a.rarity] !== undefined) ? GACHA_RARITY_ORDER[a.rarity] : 9;
+        const rb = (GACHA_RARITY_ORDER[b.rarity] !== undefined) ? GACHA_RARITY_ORDER[b.rarity] : 9;
+        return ra - rb || (b.count || 1) - (a.count || 1);
+    });
+    const items = list.map(function (c) {
+        return '<div class="gacha-own-card rarity-' + c.rarity + '">' + gachaPortraitHTML(c.id, 2)
+            + '<div class="gacha-own-name">' + t(c.name) + '</div>'
+            + '<div class="gacha-own-rarity">' + c.rarity + ((c.count || 1) > 1 ? ' ×' + c.count : '') + '</div>'
+            + '</div>';
+    }).join('');
+    gachaWarehouseEl.innerHTML = items || '<span style="opacity:.5">' + t('尚無角色，擊殺 Boss 取得星輝後即可抽卡') + '</span>';
+}
 
 function renderGachaPanel() {
     if (!gachaModal || typeof GachaSystem === 'undefined') return;
+    const cfg = GachaSystem.GACHA_CONFIG;
     if (gachaBalanceEl) gachaBalanceEl.textContent = String(GachaSystem.getBalance(gachaState));
-    if (gachaPullBtn) gachaPullBtn.textContent = tf('單抽（{cost} 星輝）', { cost: GachaSystem.GACHA_CONFIG.costPerPull });
-    if (gachaWarehouseEl) {
-        const items = gachaState.warehouse.slice(-8).reverse().map(function (c) {
-            return '<span class="gacha-item rarity-' + c.rarity + '">' + t(c.name) + ' <small>[' + c.rarity + ']</small></span>';
-        }).join('');
-        gachaWarehouseEl.innerHTML = items || '<span style="opacity:.5">' + t('尚無角色，擊殺 Boss 取得星輝後即可抽卡') + '</span>';
+    if (gachaTicketsEl) gachaTicketsEl.textContent = String(GachaSystem.getTickets(gachaState));
+    if (gachaTabStandardEl) gachaTabStandardEl.classList.toggle('active', gachaActiveBanner === 'standard');
+    if (gachaTabLimitedEl) gachaTabLimitedEl.classList.toggle('active', gachaActiveBanner === 'limited');
+    // 卡池資訊:UP 角色 / 輪換倒數 / 保底進度
+    if (gachaBannerInfoEl) {
+        const banner = currentGachaBanner();
+        const pityKey = (banner.kind === 'limited') ? 'limited' : 'standard';
+        const pity = (gachaState.pity && gachaState.pity[pityKey]) || { ssrCount: 0, srCount: 0 };
+        let html = '';
+        if (banner.kind === 'limited' && banner.up) {
+            const upChar = (typeof CHAR_BY_ID !== 'undefined') ? CHAR_BY_ID[banner.up] : null;
+            const remainMs = GachaSystem.rotationRemainMs();
+            const remainDays = Math.max(0, Math.floor(remainMs / 86400000));
+            const remainHrs = Math.max(0, Math.floor((remainMs % 86400000) / 3600000));
+            html += '<div class="gacha-up">' + tf('UP 角色：{name}（SSR 有 50% 機率為 UP，歪後下次必中）', { name: upChar ? t(upChar.name) : banner.up }) + '</div>';
+            html += '<div class="gacha-rotate">' + tf('本池輪換剩餘約 {d} 天 {h} 小時', { d: remainDays, h: remainHrs }) + '</div>';
+        }
+        html += '<div class="gacha-pity">' + tf('距離 SSR 保底：{n} 抽（硬保底 {t} 抽）', { n: Math.max(0, banner.pitySSR - (pity.ssrCount || 0)), t: banner.pitySSR })
+            + '｜' + tf('距離 SR 保底：{n} 抽', { n: Math.max(0, banner.pitySR - (pity.srCount || 0)) }) + '</div>';
+        gachaBannerInfoEl.innerHTML = html;
     }
+    // 按鈕文案與可用狀態(召喚券優先扣抵)
+    const plan1 = GachaSystem.planCost(gachaState, 1);
+    const plan10 = GachaSystem.planCost(gachaState, 10);
+    if (gachaPullBtn) {
+        gachaPullBtn.textContent = (plan1.ticketsUsed >= 1)
+            ? t('單抽（召喚券 ×1）')
+            : tf('單抽（{cost} 星輝）', { cost: cfg.costPerPull });
+        gachaPullBtn.disabled = !plan1.affordable;
+    }
+    if (gachaPull10Btn) {
+        gachaPull10Btn.textContent = (plan10.ticketsUsed >= 10)
+            ? t('十連（召喚券 ×10）')
+            : tf('十連（券 ×{tk} + {cost} 星輝）', { tk: plan10.ticketsUsed, cost: plan10.xinghuiCost });
+        gachaPull10Btn.disabled = !plan10.affordable;
+    }
+    renderGachaWarehouse();
 }
 
 function openGachaPanel() {
@@ -1818,29 +1898,81 @@ function openGachaPanel() {
     gachaModal.classList.remove('hidden');
 }
 
-function doGachaPull() {
+function selectGachaBanner(kind) {
+    gachaActiveBanner = kind;
+    if (gachaResultEl) gachaResultEl.innerHTML = '';
+    renderGachaPanel();
+}
+
+function renderGachaResults(results) {
+    if (!gachaResultEl) return;
+    gachaResultEl.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'gacha-cards';
+    let maxDelay = 0;
+    results.forEach(function (r, i) {
+        const card = document.createElement('div');
+        const delay = Math.min(i * 110, 1210);
+        card.className = 'gacha-card rarity-' + r.rarity + ((r.rarity === 'SSR') ? ' ssr-card' : '');
+        card.style.animationDelay = delay + 'ms';
+        if (delay > maxDelay) maxDelay = delay;
+        let badges = r.isNew
+            ? '<div class="gacha-badge badge-new">' + t('NEW') + '</div>'
+            : '<div class="gacha-badge badge-dupe">' + tf('重複 +{d} 星輝', { d: r.dust || 0 }) + '</div>';
+        if (r.up) badges += '<div class="gacha-badge badge-up">' + t('UP！') + '</div>';
+        card.innerHTML = gachaPortraitHTML(r.char.id, 3)
+            + '<div class="gacha-card-name">' + t(r.char.name) + '</div>'
+            + '<div class="gacha-card-rarity">' + r.rarity + '</div>' + badges;
+        wrap.appendChild(card);
+        if (r.rarity === 'SSR') setTimeout(function () { playSound('levelup'); }, delay + 240);
+    });
+    const newCount = results.filter(function (r) { return r.isNew; }).length;
+    const dust = results.reduce(function (s, r) { return s + (r.dust || 0); }, 0);
+    const summary = document.createElement('div');
+    summary.className = 'gacha-summary';
+    summary.style.animationDelay = (maxDelay + 430) + 'ms';
+    summary.textContent = (dust > 0)
+        ? tf('獲得 {new} 位新角色，重複角色轉化 +{dust} 星輝', { new: newCount, dust: dust })
+        : tf('獲得 {new} 位新角色', { new: newCount });
+    gachaResultEl.appendChild(wrap);
+    gachaResultEl.appendChild(summary);
+    if (results.some(function (r) { return r.rarity === 'SSR'; })) {
+        const flash = document.createElement('div');
+        flash.className = 'gacha-flash';
+        gachaResultEl.appendChild(flash);
+        setTimeout(function () { if (flash.parentNode) flash.parentNode.removeChild(flash); }, 1000);
+    }
+}
+
+function doGachaPull(bannerId, count) {
     if (typeof GachaSystem === 'undefined') return;
-    const result = GachaSystem.tryPull(gachaState);
+    const banner = bannerId || gachaActiveBanner;
+    const n = (count === 10) ? 10 : 1;
+    const result = GachaSystem.pullBanner(gachaState, banner, n);
     if (!result.ok) {
         if (result.error === 'insufficient') {
-            // 星輝(鑽石)餘額不足 → 即時彈窗提醒
-            alert(tf('星輝不足，無法抽卡！單抽需要 {cost} 顆，目前餘額 {balance} 顆。擊殺 Boss 可獲得星輝。', { cost: GachaSystem.GACHA_CONFIG.costPerPull, balance: result.balance }));
+            if (n === 1) {
+                alert(tf('星輝不足，無法抽卡！單抽需要 {cost} 顆，目前餘額 {balance} 顆。擊殺 Boss 可獲得星輝。', { cost: GachaSystem.GACHA_CONFIG.costPerPull, balance: result.balance }));
+            } else {
+                alert(tf('星輝不足！十連需 {cost} 顆星輝（召喚券 ×{tk} 抵扣後），目前餘額 {balance} 顆。擊殺 Boss 可獲得星輝。', { cost: result.needed, tk: result.ticketsUsed, balance: result.balance }));
+            }
         } else {
             alert(t('抽卡失敗，請稍後再試。'));
         }
         return;
     }
-    saveGachaState(); // 原子操作成功後持久化(餘額 + 倉庫 + 日誌)
+    saveGachaState(); // 原子操作成功後持久化(餘額 + 券 + 倉庫 + 保底 + 日誌)
     playSound('levelup');
-    if (gachaResultEl) {
-        gachaResultEl.innerHTML = '<span class="gacha-item rarity-' + result.rarity + '">' + tf('獲得角色：{name}（{rarity}）', { name: t(result.character.name), rarity: result.rarity }) + '</span>';
-    }
+    renderGachaResults(result.results);
     renderGachaPanel();
 }
 
 if (gachaOpenBtn) gachaOpenBtn.addEventListener('click', openGachaPanel);
 if (gachaCloseBtn) gachaCloseBtn.addEventListener('click', () => { if (gachaModal) gachaModal.classList.add('hidden'); });
-if (gachaPullBtn) gachaPullBtn.addEventListener('click', doGachaPull);
+if (gachaPullBtn) gachaPullBtn.addEventListener('click', () => doGachaPull(gachaActiveBanner, 1));
+if (gachaPull10Btn) gachaPull10Btn.addEventListener('click', () => doGachaPull(gachaActiveBanner, 10));
+if (gachaTabStandardEl) gachaTabStandardEl.addEventListener('click', () => selectGachaBanner('standard'));
+if (gachaTabLimitedEl) gachaTabLimitedEl.addEventListener('click', () => selectGachaBanner('limited'));
 
 function applyEquippedUnits() {
     fundsGainMultiplier = 1;

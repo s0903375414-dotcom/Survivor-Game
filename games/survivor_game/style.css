@@ -2264,3 +2264,41 @@ h1 {
     .death-title { font-size: 26px; letter-spacing: 2px; }
     .result-title { font-size: 24px; letter-spacing: 2px; }
 }
+
+/* ===== 星輝抽卡 v2:卡池分頁 / 保底資訊 / 結果卡動畫 / 倉庫 ===== */
+.gacha-tabs { display: flex; gap: 8px; justify-content: center; margin: 10px 0 6px; }
+.gacha-tab { padding: 6px 18px; border: 1px solid rgba(255,255,255,.25); border-radius: 18px; background: rgba(255,255,255,.05); color: #cbd5e1; cursor: pointer; font-size: .95em; transition: all .18s; }
+.gacha-tab:hover { border-color: rgba(255,255,255,.5); }
+.gacha-tab.active { background: linear-gradient(135deg, #3b2f63, #6a4a9e); color: #fff; border-color: #a78bfa; box-shadow: 0 0 10px rgba(167,139,250,.45); }
+.gacha-banner-info { text-align: center; font-size: .9em; color: #aab4c4; margin-bottom: 8px; line-height: 1.7; }
+.gacha-banner-info .gacha-up { color: #ffd700; font-weight: 600; }
+.gacha-banner-info .gacha-rotate { color: #8fb8cf; }
+.gacha-actions { display: flex; gap: 10px; justify-content: center; margin: 8px 0 10px; flex-wrap: wrap; }
+.gacha-actions button:disabled { opacity: .4; cursor: not-allowed; }
+.gacha-result { position: relative; min-height: 120px; margin-bottom: 10px; }
+.gacha-cards { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.gacha-card { position: relative; width: 96px; padding: 8px 6px 30px; border: 2px solid #555; border-radius: 10px; background: rgba(255,255,255,.06); text-align: center; opacity: 0; animation: gachaCardIn .5s cubic-bezier(.2,.9,.3,1.4) both; }
+.gacha-card-img { width: 64px; height: 80px; image-rendering: pixelated; }
+.gacha-card-name { font-size: .85em; margin-top: 4px; }
+.gacha-card-rarity { font-size: .75em; opacity: .8; letter-spacing: 2px; }
+.gacha-card.rarity-N { border-color: #8b9aa9; }
+.gacha-card.rarity-R { border-color: #4aa3ff; box-shadow: 0 0 8px rgba(74,163,255,.35); }
+.gacha-card.rarity-SR { border-color: #c07bff; box-shadow: 0 0 10px rgba(192,123,255,.5); }
+.gacha-card.ssr-card { border-color: #ffd700; box-shadow: 0 0 18px rgba(255,215,0,.75); animation: gachaCardIn .5s cubic-bezier(.2,.9,.3,1.4) both, gachaSSRpulse .9s ease .55s 2; }
+.gacha-badge { position: absolute; top: -9px; right: -6px; padding: 2px 7px; border-radius: 10px; font-size: .7em; font-weight: 700; }
+.badge-new { background: #22c55e; color: #fff; }
+.badge-dupe { background: #64748b; color: #fff; }
+.badge-up { position: absolute; top: -9px; left: -6px; background: #f43f5e; color: #fff; padding: 2px 7px; border-radius: 10px; font-size: .7em; font-weight: 700; }
+.gacha-summary { text-align: center; font-size: .95em; color: #e2e8f0; margin-top: 8px; opacity: 0; animation: gachaCardIn .4s ease both; }
+.gacha-flash { position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,215,0,.55), transparent 65%); border-radius: 12px; pointer-events: none; animation: gachaFlash .9s ease both; }
+.gacha-warehouse { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-height: 200px; overflow-y: auto; }
+.gacha-own-card { width: 78px; padding: 6px 4px 8px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: rgba(255,255,255,.05); text-align: center; }
+.gacha-own-card img { width: 48px; height: 60px; image-rendering: pixelated; }
+.gacha-own-card.rarity-SSR { border-color: #ffd700; box-shadow: 0 0 8px rgba(255,215,0,.35); }
+.gacha-own-card.rarity-SR { border-color: #c07bff; }
+.gacha-own-card.rarity-R { border-color: #4aa3ff; }
+.gacha-own-name { font-size: .75em; }
+.gacha-own-rarity { font-size: .7em; opacity: .75; }
+@keyframes gachaCardIn { from { opacity: 0; transform: translateY(18px) scale(.6) rotate(4deg); } to { opacity: 1; transform: none; } }
+@keyframes gachaSSRpulse { 0%, 100% { transform: none; } 35% { transform: scale(1.12); } 60% { transform: scale(.97); } }
+@keyframes gachaFlash { from { opacity: 1; } to { opacity: 0; } }
