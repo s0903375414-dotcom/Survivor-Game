@@ -1,3 +1,8 @@
+// ===== 安全 localStorage 存取(與 game.js 同款防護) =====
+function lsGet(k) { try { return lsGet(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { lsSet(k, v); return true; } catch (e) { return false; } }
+function lsDel(k) { try { lsDel(k); return true; } catch (e) { return false; } }
+
 // 資料管理員 - 統一管理帳號、存檔、排行榜
 // 自動偵測 Firebase 是否設定，有就用 Firebase，沒有用回 localStorage
 
@@ -142,17 +147,17 @@ const DataManager = (function() {
 
     function saveToLocal(data) {
         const prefix = currentUser ? `_${currentUser.username}` : '';
-        if (data.funds !== undefined) localStorage.setItem(`survivor_funds${prefix}`, String(data.funds));
-        if (data.unitsOwned !== undefined) localStorage.setItem(`survivor_units_owned${prefix}`, JSON.stringify(data.unitsOwned));
-        if (data.unitsEquipped !== undefined) localStorage.setItem(`survivor_units_equipped${prefix}`, JSON.stringify(data.unitsEquipped));
+        if (data.funds !== undefined) lsSet(`survivor_funds${prefix}`, String(data.funds));
+        if (data.unitsOwned !== undefined) lsSet(`survivor_units_owned${prefix}`, JSON.stringify(data.unitsOwned));
+        if (data.unitsEquipped !== undefined) lsSet(`survivor_units_equipped${prefix}`, JSON.stringify(data.unitsEquipped));
     }
 
     function loadFromLocal() {
         const prefix = currentUser ? `_${currentUser.username}` : '';
         return {
-            funds: parseInt(localStorage.getItem(`survivor_funds${prefix}`) || '0'),
-            unitsOwned: JSON.parse(localStorage.getItem(`survivor_units_owned${prefix}`) || '{}'),
-            unitsEquipped: JSON.parse(localStorage.getItem(`survivor_units_equipped${prefix}`) || '{}')
+            funds: parseInt(lsGet(`survivor_funds${prefix}`) || '0'),
+            unitsOwned: JSON.parse(lsGet(`survivor_units_owned${prefix}`) || '{}'),
+            unitsEquipped: JSON.parse(lsGet(`survivor_units_equipped${prefix}`) || '{}')
         };
     }
 
@@ -211,20 +216,20 @@ const DataManager = (function() {
 
     function loadLocalLeaderboard() {
         try {
-            const raw = localStorage.getItem('survivor_leaderboard');
+            const raw = lsGet('survivor_leaderboard');
             return raw ? JSON.parse(raw) : [];
         } catch { return []; }
     }
 
     function saveLocalLeaderboard(list) {
-        localStorage.setItem('survivor_leaderboard', JSON.stringify(list));
+        lsSet('survivor_leaderboard', JSON.stringify(list));
     }
 
     // ===== 舊版相容性函數 =====
 
     function legacyRegister(email, password, username) {
         // 舊版 localStorage 註冊邏輯
-        const v2Raw = localStorage.getItem('survivor_accounts_v2');
+        const v2Raw = lsGet('survivor_accounts_v2');
         const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
         
         if (v2Accounts[email]) {
@@ -244,13 +249,13 @@ const DataManager = (function() {
             user: { username, uid, email }
         };
         
-        localStorage.setItem('survivor_accounts_v2', JSON.stringify(v2Accounts));
+        lsSet('survivor_accounts_v2', JSON.stringify(v2Accounts));
         
         return { success: true, user: { username, uid, email } };
     }
 
     function legacyLogin(email, password) {
-        const v2Raw = localStorage.getItem('survivor_accounts_v2');
+        const v2Raw = lsGet('survivor_accounts_v2');
         const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
         
         if (v2Accounts[email] && v2Accounts[email].password === password) {
@@ -258,7 +263,7 @@ const DataManager = (function() {
         }
         
         // 檢查舊版帳號
-        const accRaw = localStorage.getItem('survivor_accounts');
+        const accRaw = lsGet('survivor_accounts');
         const accounts = accRaw ? JSON.parse(accRaw) : {};
         if (accounts[email] && accounts[email].password === password) {
             return { success: true, user: accounts[email].user };

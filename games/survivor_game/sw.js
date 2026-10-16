@@ -1,10 +1,12 @@
-const CACHE_NAME = 'survivor-game-v5';
+const CACHE_NAME = 'survivor-game-v6';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './game.js',
   './characters_data.js',
+  './equipment.js',
+  './codex.js',
   './gacha.js',
   './i18n.js',
   './i18n_dict_1.js',

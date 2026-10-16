@@ -31,6 +31,12 @@ const tacticalSkillOverlay = document.getElementById('tactical-skill-overlay');
 const gameOverScreen = document.getElementById('game-over-screen');
 
 // Settings Elements
+// ===== 安全 localStorage 存取(隱私模式/WebView 被拒時降級,不崩潰 — 裝備/登入/進度載入根因修復) =====
+function lsGet(k) { try { return lsGet(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { lsSet(k, v); return true; } catch (e) { return false; } }
+function lsDel(k) { try { lsDel(k); return true; } catch (e) { return false; } }
+function lsClear() { try { lsClear(); return true; } catch (e) { return false; } }
+
 const settingsModal = document.getElementById('settings-modal');
 const settingsTriggerBtn = document.getElementById('settings-trigger-btn');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
@@ -55,7 +61,7 @@ let gameSettings = {
 };
 
 function loadSettings() {
-    const saved = localStorage.getItem('survivor_settings');
+    const saved = lsGet('survivor_settings');
     if (saved) {
         gameSettings = { ...gameSettings, ...JSON.parse(saved) };
     }
@@ -97,7 +103,7 @@ function saveSettings() {
         showDamage: showDamageCheckbox.checked,
         particleQuality: particleQualitySelect.value
     };
-    localStorage.setItem('survivor_settings', JSON.stringify(gameSettings));
+    lsSet('survivor_settings', JSON.stringify(gameSettings));
     applySettings();
     settingsModal.classList.add('hidden');
     createFloatingText(canvas.width/2, canvas.height/2, t('設定已儲存'), "#00ffff");
@@ -327,12 +333,12 @@ function setControlMode(mode) {
         mobileControlsUI.classList.add('hidden');
         if (skillKeyLabel) skillKeyLabel.textContent = 'SPACE';
     }
-    localStorage.setItem('survivor_control_mode', mode);
+    lsSet('survivor_control_mode', mode);
     if (modeSelectionModal) modeSelectionModal.classList.add('hidden');
 }
 
 // Initial detection or load from storage
-const savedMode = localStorage.getItem('survivor_control_mode');
+const savedMode = lsGet('survivor_control_mode');
 if (savedMode) {
     setControlMode(savedMode);
     if (modeSelectionModal) modeSelectionModal.classList.add('hidden');
@@ -761,9 +767,9 @@ if (menuBtn) {
 
 function saveUserSession() {
     if (currentUser) {
-        localStorage.setItem('survivor_user', JSON.stringify(currentUser));
+        lsSet('survivor_user', JSON.stringify(currentUser));
     } else {
-        localStorage.removeItem('survivor_user');
+        lsDel('survivor_user');
     }
 }
 
@@ -775,7 +781,7 @@ function tutorialKey() {
 function showTutorialIfNeeded() {
     const k = tutorialKey();
     if (!k) return;
-    const done = localStorage.getItem(k);
+    const done = lsGet(k);
     if (!done && tutorialModal) {
         tutorialModal.classList.remove('hidden');
     }
@@ -784,7 +790,7 @@ function showTutorialIfNeeded() {
 function resetTutorial() {
     const k = tutorialKey();
     if (!k) return;
-    localStorage.removeItem(k);
+    lsDel(k);
     if (tutorialModal) {
         tutorialModal.classList.remove('hidden');
     }
@@ -799,7 +805,7 @@ function resetTutorial() {
 function markTutorialDone() {
     const k = tutorialKey();
     if (!k) return;
-    localStorage.setItem(k, '1');
+    lsSet(k, '1');
     if (tutorialModal) tutorialModal.classList.add('hidden');
     if (commanderGuide) {
         commanderGuide.classList.add('hidden');
@@ -854,17 +860,17 @@ function migrateUserProgress(oldName, newName) {
     bases.forEach(b => {
         const oldKey = `${b}_${oldName}`;
         const newKey = `${b}_${newName}`;
-        const val = localStorage.getItem(oldKey);
+        const val = lsGet(oldKey);
         if (val !== null && val !== undefined) {
-            localStorage.setItem(newKey, val);
-            localStorage.removeItem(oldKey);
+            lsSet(newKey, val);
+            lsDel(oldKey);
         }
     });
 }
 
 function isCurrentUserBound() {
     try {
-        const raw = localStorage.getItem('survivor_google_bindings');
+        const raw = lsGet('survivor_google_bindings');
         const bindings = raw ? JSON.parse(raw) : {};
         if (!currentUser) return false;
         const entries = Object.entries(bindings);
@@ -915,11 +921,11 @@ function isDevAccount(user) {
 function isUsernameTaken(username) {
     if (['Dev',t('開發人員'),'Developer','Admin',t('開發團隊')].concat(DEV_TEAM_ALIASES).includes(username)) return true;
     
-    const accountsRaw = localStorage.getItem('survivor_accounts');
+    const accountsRaw = lsGet('survivor_accounts');
     const oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
     if (oldAccounts[username]) return true;
     
-    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    const v2Raw = lsGet('survivor_accounts_v2');
     const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
     for (const email in v2Accounts) {
         if (v2Accounts[email] && v2Accounts[email].user && v2Accounts[email].user.username === username) {
@@ -927,7 +933,7 @@ function isUsernameTaken(username) {
         }
     }
     
-    const bindingsRaw = localStorage.getItem('survivor_google_bindings');
+    const bindingsRaw = lsGet('survivor_google_bindings');
     const bindings = bindingsRaw ? JSON.parse(bindingsRaw) : {};
     for (const key in bindings) {
         if (bindings[key] && bindings[key].username === username) return true;
@@ -937,7 +943,7 @@ function isUsernameTaken(username) {
 }
 
 function isEmailTaken(email) {
-    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    const v2Raw = lsGet('survivor_accounts_v2');
     const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
     return !!v2Accounts[email];
 }
@@ -954,21 +960,21 @@ function handleAccountRename() {
     }
 
     if (currentUser.email) {
-        const v2Raw = localStorage.getItem('survivor_accounts_v2');
+        const v2Raw = lsGet('survivor_accounts_v2');
         let v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
         if (v2Accounts[currentUser.email]) {
             v2Accounts[currentUser.email].user.username = newName;
-            localStorage.setItem('survivor_accounts_v2', JSON.stringify(v2Accounts));
+            lsSet('survivor_accounts_v2', JSON.stringify(v2Accounts));
         }
     } else {
         // Fallback for old accounts if they bypassed migration
-        const raw = localStorage.getItem('survivor_accounts');
+        const raw = lsGet('survivor_accounts');
         let accounts = raw ? JSON.parse(raw) : {};
         if (accounts[oldName]) {
             const pw = accounts[oldName].password;
             accounts[newName] = { password: pw, user: { ...currentUser, username: newName } };
             delete accounts[oldName];
-            localStorage.setItem('survivor_accounts', JSON.stringify(accounts));
+            lsSet('survivor_accounts', JSON.stringify(accounts));
         }
     }
 
@@ -1019,11 +1025,11 @@ function handleBtnRegSubmit() {
     
     currentUser = { username, uid, isAdmin: false, email: tempRegData.email };
     
-    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    const v2Raw = lsGet('survivor_accounts_v2');
     let v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
     
     v2Accounts[tempRegData.email] = { password: tempRegData.password, user: currentUser };
-    localStorage.setItem('survivor_accounts_v2', JSON.stringify(v2Accounts));
+    lsSet('survivor_accounts_v2', JSON.stringify(v2Accounts));
     
     tempRegData = { email: '', password: '' };
     
@@ -1064,7 +1070,7 @@ function handleBtnSubmitLogin() {
         return;
     }
     
-    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    const v2Raw = lsGet('survivor_accounts_v2');
     const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
     
     if (v2Accounts[emailOrOldId] && v2Accounts[emailOrOldId].password === password) {
@@ -1074,7 +1080,7 @@ function handleBtnSubmitLogin() {
         return;
     }
     
-    const accountsRaw = localStorage.getItem('survivor_accounts');
+    const accountsRaw = lsGet('survivor_accounts');
     const oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
     
     if (oldAccounts[emailOrOldId]) {
@@ -1118,7 +1124,7 @@ function handleBtnSubmitMigration() {
         return;
     }
     
-    const v2Raw = localStorage.getItem('survivor_accounts_v2');
+    const v2Raw = lsGet('survivor_accounts_v2');
     let v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
     
     tempMigrationData.userObj.email = bindEmail;
@@ -1127,12 +1133,12 @@ function handleBtnSubmitMigration() {
         user: tempMigrationData.userObj
     };
     
-    localStorage.setItem('survivor_accounts_v2', JSON.stringify(v2Accounts));
+    lsSet('survivor_accounts_v2', JSON.stringify(v2Accounts));
     
-    const accountsRaw = localStorage.getItem('survivor_accounts');
+    const accountsRaw = lsGet('survivor_accounts');
     let oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
     delete oldAccounts[tempMigrationData.username];
-    localStorage.setItem('survivor_accounts', JSON.stringify(oldAccounts));
+    lsSet('survivor_accounts', JSON.stringify(oldAccounts));
     
     currentUser = tempMigrationData.userObj;
     tempMigrationData = { username: '', password: '', userObj: null };
@@ -1160,7 +1166,7 @@ function handleGoogleLogin(response) {
         }).join(''));
 
         const googleUser = JSON.parse(jsonPayload);
-        const bindingsRaw = localStorage.getItem('survivor_google_bindings');
+        const bindingsRaw = lsGet('survivor_google_bindings');
         let bindings = bindingsRaw ? JSON.parse(bindingsRaw) : {};
         let hash = 0;
         const seed = googleUser.sub || googleUser.email;
@@ -1173,7 +1179,7 @@ function handleGoogleLogin(response) {
 
         if (accountSettingsModal && !accountSettingsModal.classList.contains('hidden') && currentUser) {
             bindings[seed] = { username: currentUser.username, uid: currentUser.uid };
-            localStorage.setItem('survivor_google_bindings', JSON.stringify(bindings));
+            lsSet('survivor_google_bindings', JSON.stringify(bindings));
             currentUser = { 
                 ...currentUser,
                 isGoogleUser: true,
@@ -1193,7 +1199,7 @@ function handleGoogleLogin(response) {
             const boundUid = bindings[seed].uid || uid;
             let found = false;
             
-            const v2Raw = localStorage.getItem('survivor_accounts_v2');
+            const v2Raw = lsGet('survivor_accounts_v2');
             const v2Accounts = v2Raw ? JSON.parse(v2Raw) : {};
             for (const email in v2Accounts) {
                 if (v2Accounts[email].user && v2Accounts[email].user.username === boundName) {
@@ -1204,7 +1210,7 @@ function handleGoogleLogin(response) {
             }
             
             if (!found) {
-                const accountsRaw = localStorage.getItem('survivor_accounts');
+                const accountsRaw = lsGet('survivor_accounts');
                 const oldAccounts = accountsRaw ? JSON.parse(accountsRaw) : {};
                 if (oldAccounts[boundName]) {
                     currentUser = oldAccounts[boundName].user;
@@ -1295,7 +1301,7 @@ function handleFeedbackSubmit() {
     }
 
     // 儲存反饋至本機 (模擬傳送到伺服器)
-    const feedbacksRaw = localStorage.getItem('survivor_feedbacks');
+    const feedbacksRaw = lsGet('survivor_feedbacks');
     let feedbacks = feedbacksRaw ? JSON.parse(feedbacksRaw) : [];
     
     feedbacks.push({
@@ -1305,7 +1311,7 @@ function handleFeedbackSubmit() {
         time: new Date().toLocaleString()
     });
 
-    localStorage.setItem('survivor_feedbacks', JSON.stringify(feedbacks));
+    lsSet('survivor_feedbacks', JSON.stringify(feedbacks));
     
     feedbackContentInput.value = '';
     feedbackModal.classList.add('hidden');
@@ -1314,7 +1320,7 @@ function handleFeedbackSubmit() {
 
 function renderAdminFeedbacks() {
     if (!adminFeedbackList) return;
-    const feedbacksRaw = localStorage.getItem('survivor_feedbacks');
+    const feedbacksRaw = lsGet('survivor_feedbacks');
     const feedbacks = feedbacksRaw ? JSON.parse(feedbacksRaw) : [];
     
     adminFeedbackList.innerHTML = '';
@@ -1348,10 +1354,10 @@ function renderAdminData() {
     if (!adminDataList) return;
     
     // 獲取所有帳號資料
-    const accountsRaw = localStorage.getItem('survivor_accounts');
+    const accountsRaw = lsGet('survivor_accounts');
     const accounts = accountsRaw ? JSON.parse(accountsRaw) : {};
     
-    const accountsV2Raw = localStorage.getItem('survivor_accounts_v2');
+    const accountsV2Raw = lsGet('survivor_accounts_v2');
     const accountsV2 = accountsV2Raw ? JSON.parse(accountsV2Raw) : {};
     
     adminDataList.innerHTML = '';
@@ -1361,9 +1367,9 @@ function renderAdminData() {
     
     // 處理 V1 帳號
     for (const name in accounts) {
-        const funds = localStorage.getItem(`survivor_funds_${name}`) || 0;
-        const score = localStorage.getItem(`survivor_highest_score_${name}`) || 0;
-        const unitsRaw = localStorage.getItem(`survivor_units_owned_${name}`);
+        const funds = lsGet(`survivor_funds_${name}`) || 0;
+        const score = lsGet(`survivor_highest_score_${name}`) || 0;
+        const unitsRaw = lsGet(`survivor_units_owned_${name}`);
         const units = unitsRaw ? Object.keys(JSON.parse(unitsRaw)).length : 0;
         
         allPlayers.push({
@@ -1383,9 +1389,9 @@ function renderAdminData() {
         // 檢查是否已在 V1 處理過
         if (allPlayers.some(p => p.username === user.username)) continue;
         
-        const funds = localStorage.getItem(`survivor_funds_${user.username}`) || 0;
-        const score = localStorage.getItem(`survivor_highest_score_${user.username}`) || 0;
-        const unitsRaw = localStorage.getItem(`survivor_units_owned_${user.username}`);
+        const funds = lsGet(`survivor_funds_${user.username}`) || 0;
+        const score = lsGet(`survivor_highest_score_${user.username}`) || 0;
+        const unitsRaw = lsGet(`survivor_units_owned_${user.username}`);
         const units = unitsRaw ? Object.keys(JSON.parse(unitsRaw)).length : 0;
         
         allPlayers.push({
@@ -1429,7 +1435,7 @@ function handleAccountDeletion() {
         
     if (confirm(confirmMsg)) {
         if (currentUser.isAdmin) {
-            localStorage.clear(); // Admin clears everything
+            lsClear(); // Admin clears everything
             alert(t('所有系統數據已格式化完成。'));
         } else {
             // Remove user entries from leaderboard
@@ -1439,10 +1445,10 @@ function handleAccountDeletion() {
 
             // Regular user deletion
             const prefix = `_${usernameToDelete}`;
-            localStorage.removeItem('survivor_user');
-            localStorage.removeItem(`survivor_funds${prefix}`);
-            localStorage.removeItem(`survivor_units_owned${prefix}`);
-            localStorage.removeItem(`survivor_units_equipped${prefix}`);
+            lsDel('survivor_user');
+            lsDel(`survivor_funds${prefix}`);
+            lsDel(`survivor_units_owned${prefix}`);
+            lsDel(`survivor_units_equipped${prefix}`);
             alert(t('帳號與相關戰績已成功註銷。'));
         }
         window.location.reload();
@@ -1452,7 +1458,7 @@ function handleAccountDeletion() {
 function handleAdminClearData() {
     if (!currentUser || !currentUser.isAdmin) return;
     if (confirm(t('⚠️ 警告：這將刪除包括排行榜、所有使用者紀錄、軍資在內的所有數據！確定執行格式化嗎？'))) {
-        localStorage.clear();
+        lsClear();
         alert(t('數據已全數清空。'));
         window.location.reload();
     }
@@ -1573,7 +1579,7 @@ function renderLeaderboard() {
 }
 
 function loadLeaderboard() {
-    const raw = localStorage.getItem('survivor_leaderboard');
+    const raw = lsGet('survivor_leaderboard');
     if (!raw) return [];
     try {
         const parsed = JSON.parse(raw);
@@ -1584,7 +1590,7 @@ function loadLeaderboard() {
 }
 
 function saveLeaderboard(list) {
-    localStorage.setItem('survivor_leaderboard', JSON.stringify(list));
+    lsSet('survivor_leaderboard', JSON.stringify(list));
 }
 
 function recordScoreToLeaderboard(finalScore) {
@@ -1614,34 +1620,24 @@ function loadMetaProgress() {
         return;
     }
 
-    const savedFunds = localStorage.getItem(`survivor_funds${prefix}`);
-    if (savedFunds) {
-        const parsed = parseInt(savedFunds, 10);
-        if (!Number.isNaN(parsed)) militaryFunds = parsed;
+    // 修復:統一走 EquipmentSystem(safeStorage 防護 — 隱私模式/WebView 存取被拒時不再拋例外中斷登入與裝備載入)
+    militaryFunds = 0;
+    ownedUnits = {};
+    equippedUnits = {};
+    if (typeof EquipmentSystem !== 'undefined') {
+        const st = { funds: 0, owned: {}, equipped: {} };
+        EquipmentSystem.load(st, { prefix: prefix });
+        militaryFunds = st.funds;
+        ownedUnits = st.owned;
+        equippedUnits = st.equipped;
     } else {
-        militaryFunds = 0;
-    }
-
-    const savedOwned = localStorage.getItem(`survivor_units_owned${prefix}`);
-    if (savedOwned) {
-        try {
-            ownedUnits = JSON.parse(savedOwned) || {};
-        } catch {
-            ownedUnits = {};
+        const savedFunds = lsGet(`survivor_funds${prefix}`);
+        if (savedFunds) {
+            const parsed = parseInt(savedFunds, 10);
+            if (!Number.isNaN(parsed)) militaryFunds = parsed;
         }
-    } else {
-        ownedUnits = {};
-    }
-
-    const savedEquipped = localStorage.getItem(`survivor_units_equipped${prefix}`);
-    if (savedEquipped) {
-        try {
-            equippedUnits = JSON.parse(savedEquipped) || {};
-        } catch {
-            equippedUnits = {};
-        }
-    } else {
-        equippedUnits = {};
+        try { const o = JSON.parse(lsGet(`survivor_units_owned${prefix}`)); if (o && typeof o === 'object') ownedUnits = o; } catch (e) { /* 損毀存檔 */ }
+        try { const q = JSON.parse(lsGet(`survivor_units_equipped${prefix}`)); if (q && typeof q === 'object') equippedUnits = q; } catch (e) { /* 損毀存檔 */ }
     }
     updateFundsUI();
 }
@@ -1774,9 +1770,13 @@ function menuBgLoop(timestamp) {
 
 function saveMetaProgress() {
     const prefix = currentUser ? `_${currentUser.username}` : '';
-    localStorage.setItem(`survivor_funds${prefix}`, String(militaryFunds));
-    localStorage.setItem(`survivor_units_owned${prefix}`, JSON.stringify(ownedUnits));
-    localStorage.setItem(`survivor_units_equipped${prefix}`, JSON.stringify(equippedUnits));
+    if (typeof EquipmentSystem !== 'undefined') {
+        EquipmentSystem.save({ funds: militaryFunds, owned: ownedUnits, equipped: equippedUnits }, { prefix: prefix });
+        return;
+    }
+    lsSet(`survivor_funds${prefix}`, String(militaryFunds));
+    lsSet(`survivor_units_owned${prefix}`, JSON.stringify(ownedUnits));
+    lsSet(`survivor_units_equipped${prefix}`, JSON.stringify(equippedUnits));
 }
 
 // ===== 星輝(鑽石)角色抽卡系統:玩家資料持久化 + 面板接線 =====
@@ -1796,27 +1796,27 @@ function loadGachaState() {
     }
     gachaState = { diamond: 0, tickets: 0, warehouse: [], logs: [], pity: {} };
     let hadSave = false;
-    try { const d = parseInt(localStorage.getItem(gachaStoreKey('xinghui')), 10); if (!isNaN(d)) { gachaState.diamond = d; hadSave = true; } } catch (e) { /* ignore */ }
-    try { const w = JSON.parse(localStorage.getItem(gachaStoreKey('warehouse'))); if (Array.isArray(w)) { gachaState.warehouse = w; hadSave = true; } } catch (e) { /* ignore */ }
-    try { const l = JSON.parse(localStorage.getItem(gachaStoreKey('xinghui_logs'))); if (Array.isArray(l)) gachaState.logs = l; } catch (e) { /* ignore */ }
-    try { const tk = parseInt(localStorage.getItem(gachaStoreKey('tickets')), 10); if (!isNaN(tk)) gachaState.tickets = tk; } catch (e) { /* ignore */ }
-    try { const p = JSON.parse(localStorage.getItem(gachaStoreKey('pity'))); if (p && typeof p === 'object') gachaState.pity = p; } catch (e) { /* ignore */ }
-    try { if (localStorage.getItem(gachaStoreKey('gacha_init'))) hadSave = true; } catch (e) { /* ignore */ }
+    try { const d = parseInt(lsGet(gachaStoreKey('xinghui')), 10); if (!isNaN(d)) { gachaState.diamond = d; hadSave = true; } } catch (e) { /* ignore */ }
+    try { const w = JSON.parse(lsGet(gachaStoreKey('warehouse'))); if (Array.isArray(w)) { gachaState.warehouse = w; hadSave = true; } } catch (e) { /* ignore */ }
+    try { const l = JSON.parse(lsGet(gachaStoreKey('xinghui_logs'))); if (Array.isArray(l)) gachaState.logs = l; } catch (e) { /* ignore */ }
+    try { const tk = parseInt(lsGet(gachaStoreKey('tickets')), 10); if (!isNaN(tk)) gachaState.tickets = tk; } catch (e) { /* ignore */ }
+    try { const p = JSON.parse(lsGet(gachaStoreKey('pity'))); if (p && typeof p === 'object') gachaState.pity = p; } catch (e) { /* ignore */ }
+    try { if (lsGet(gachaStoreKey('gacha_init'))) hadSave = true; } catch (e) { /* ignore */ }
     // 首次進入遊戲:贈送新手召喚券(starterTickets)
     if (!hadSave && typeof GachaSystem !== 'undefined' && GachaSystem.GACHA_CONFIG.starterTickets > 0) {
         gachaState.tickets = GachaSystem.GACHA_CONFIG.starterTickets;
-        try { localStorage.setItem(gachaStoreKey('gacha_init'), '1'); } catch (e) { /* ignore */ }
+        try { lsSet(gachaStoreKey('gacha_init'), '1'); } catch (e) { /* ignore */ }
         saveGachaState();
     }
 }
 
 function saveGachaState() {
     try {
-        localStorage.setItem(gachaStoreKey('xinghui'), String(gachaState.diamond));
-        localStorage.setItem(gachaStoreKey('tickets'), String(gachaState.tickets));
-        localStorage.setItem(gachaStoreKey('warehouse'), JSON.stringify(gachaState.warehouse));
-        localStorage.setItem(gachaStoreKey('xinghui_logs'), JSON.stringify(gachaState.logs));
-        localStorage.setItem(gachaStoreKey('pity'), JSON.stringify(gachaState.pity));
+        lsSet(gachaStoreKey('xinghui'), String(gachaState.diamond));
+        lsSet(gachaStoreKey('tickets'), String(gachaState.tickets));
+        lsSet(gachaStoreKey('warehouse'), JSON.stringify(gachaState.warehouse));
+        lsSet(gachaStoreKey('xinghui_logs'), JSON.stringify(gachaState.logs));
+        lsSet(gachaStoreKey('pity'), JSON.stringify(gachaState.pity));
     } catch (e) { /* localStorage 不可用時忽略 */ }
 }
 
@@ -2049,18 +2049,29 @@ if (gachaResultEl) gachaResultEl.addEventListener('click', (e) => {
 });
 
 function applyEquippedUnits() {
-    fundsGainMultiplier = 1;
-    if (equippedUnits.drone) {
-        playerUpgrades.multishot.level += 1;
+    // 修復:改為冪等重算 — 同輸入恆同輸出,重複呼叫不會再累積 maxHp/multishot;player 未初始化時不崩潰
+    if (typeof EquipmentSystem !== 'undefined') {
+        const bonus = EquipmentSystem.computeBonuses(
+            { funds: militaryFunds, owned: ownedUnits, equipped: equippedUnits },
+            { maxHp: EquipmentSystem.BASE_MAXHP }
+        );
+        fundsGainMultiplier = bonus.fundsMultiplier;
+        playerUpgrades.multishot.level = bonus.multishot; // init() 已重置為 0,此處絕對賦值保持冪等
+        if (player) {
+            player.maxHp = bonus.maxHp;
+            if (bonus.fullHeal) player.hp = player.maxHp;
+            player.updateUI();
+        }
+        return;
     }
-    if (equippedUnits.medic) {
+    fundsGainMultiplier = 1;
+    if (equippedUnits.drone) playerUpgrades.multishot.level += 1;
+    if (equippedUnits.medic && player) {
         player.maxHp += 50;
         player.hp = player.maxHp;
         player.updateUI();
     }
-    if (equippedUnits.logistics) {
-        fundsGainMultiplier = 1.5;
-    }
+    if (equippedUnits.logistics) fundsGainMultiplier = 1.5;
 }
 
 function renderUnitShop() {
@@ -2111,13 +2122,23 @@ function renderUnitShop() {
 function handlePurchaseUnit(id) {
     const unit = unitDefinitions[id];
     if (!unit) return;
-    if (militaryFunds < unit.cost) {
-        alert(t('軍資不足，無法購買此單位。'));
-        return;
+    if (typeof EquipmentSystem !== 'undefined') {
+        const st = { funds: militaryFunds, owned: ownedUnits, equipped: equippedUnits };
+        const r = EquipmentSystem.purchase(st, id);
+        militaryFunds = st.funds;
+        if (!r.ok) {
+            if (r.error === 'insufficient_funds') alert(t('軍資不足，無法購買此單位。'));
+            return; // already_owned / unknown_unit 靜默處理
+        }
+    } else {
+        if (militaryFunds < unit.cost) {
+            alert(t('軍資不足，無法購買此單位。'));
+            return;
+        }
+        militaryFunds -= unit.cost;
+        ownedUnits[id] = true;
+        equippedUnits[id] = true;
     }
-    militaryFunds -= unit.cost;
-    ownedUnits[id] = true;
-    equippedUnits[id] = true;
     saveMetaProgress();
     updateFundsUI();
     renderUnitShop();
@@ -2125,7 +2146,13 @@ function handlePurchaseUnit(id) {
 
 function toggleEquipUnit(id) {
     if (!ownedUnits[id]) return;
-    equippedUnits[id] = !equippedUnits[id];
+    if (typeof EquipmentSystem !== 'undefined') {
+        const st = { funds: militaryFunds, owned: ownedUnits, equipped: equippedUnits };
+        const r = EquipmentSystem.toggleEquip(st, id);
+        if (!r.ok) return;
+    } else {
+        equippedUnits[id] = !equippedUnits[id];
+    }
     saveMetaProgress();
     renderUnitShop();
 }
@@ -2134,7 +2161,7 @@ function toggleEquipUnit(id) {
 function checkSavedUser() {
     console.log(t('正在檢查儲存的登入狀態...'));
     try {
-        const saved = localStorage.getItem('survivor_user');
+        const saved = lsGet('survivor_user');
         if (saved && saved !== 'null' && saved !== 'undefined') {
             const parsed = JSON.parse(saved);
             if (parsed && parsed.username) {
@@ -2152,7 +2179,7 @@ function checkSavedUser() {
         }
     } catch (e) {
         console.error(t('解析儲存的用戶資料失敗:'), e);
-        localStorage.removeItem('survivor_user');
+        lsDel('survivor_user');
         currentUser = null;
         loadMetaProgress();
     }
@@ -2329,7 +2356,7 @@ setInterval(() => {
     if (clearFeedbacksBtn) {
         clearFeedbacksBtn.onclick = () => {
             if (confirm(t('確定要清空所有收集到的意見反饋嗎？此操作不可恢復。'))) {
-                localStorage.removeItem('survivor_feedbacks');
+                lsDel('survivor_feedbacks');
                 renderAdminFeedbacks();
             }
         };
