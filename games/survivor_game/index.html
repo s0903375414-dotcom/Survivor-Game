@@ -397,7 +397,7 @@
                     <div class="bottom-row">
                         <button id="gacha-btn" class="action-btn unit-btn">角色抽卡</button>
                         <button id="codex-btn" class="action-btn unit-btn">角色圖鑑</button>
-                        <button id="unit-config-btn" class="action-btn unit-btn">單位配置</button>
+                        <button id="unit-config-btn" class="action-btn unit-btn">角色庫</button>
                         <button id="settings-trigger-btn" class="action-btn settings-btn">系統設定</button>
                     </div>
                 </div>
@@ -670,8 +670,7 @@
                         <button id="gacha-pull10-btn" class="action-btn endless-btn">十連</button>
                     </div>
                     <div id="gacha-result" class="gacha-result"></div>
-                    <p class="modal-tip">我的倉庫</p>
-                    <div id="gacha-warehouse" class="gacha-warehouse"></div>
+                    <p class="modal-tip">已獲得的角色請至主選單「角色庫」查看與裝備</p>
                 </div>
             </div>
         </div>
@@ -716,16 +715,22 @@
         <div id="unit-modal" class="modal hidden">
             <div class="modal-content unit-modal-content">
                 <div class="modal-header">
-                    <h2>單位商店 / 配置</h2>
+                    <h2>角色庫</h2>
                     <button id="close-unit-btn" class="close-btn">&times;</button>
                 </div>
                 <div class="modal-body unit-modal-body">
                     <div class="unit-header-row">
-                        <div class="unit-header-title">配置你的戰術單位編制</div>
+                        <div class="unit-header-title">編制出擊角色與支援單位</div>
                         <div class="unit-header-funds">當前軍資：<span id="funds-display-modal">0</span></div>
                     </div>
-                    <p class="modal-tip">購買後即可永久解鎖，並可隨時切換裝備組合。</p>
-                    <div id="unit-list" class="unit-list-grid"></div>
+                    <div id="char-loadout-bar" class="char-loadout-bar"></div>
+                    <div class="gacha-tabs">
+                        <button id="library-tab-chars" class="gacha-tab active">出擊角色</button>
+                        <button id="library-tab-units" class="gacha-tab">支援單位</button>
+                    </div>
+                    <div id="library-grid" class="library-grid"></div>
+                    <div id="unit-list" class="unit-list-grid hidden"></div>
+                    <p class="modal-tip">出擊角色：裝備已獲得的角色即可獲得屬性加成（生命／傷害／移速），點擊卡片可查看詳細資料。</p>
                 </div>
             </div>
         </div>
@@ -941,6 +946,7 @@
     <script src="codex.js"></script>
     <script src="mobile-server-config.js"></script>
     <script src="app-update.js"></script>
+    <script src="char-loadout.js"></script>
     <script src="game.js?v=11"></script>
 </body>
 </html>

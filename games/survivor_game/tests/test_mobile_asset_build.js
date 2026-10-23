@@ -10,7 +10,7 @@ try {
     const source = path.join(temp, 'source');
     const web = path.join(source, 'www');
     fs.mkdirSync(path.join(source, 'assets'), { recursive: true });
-    fs.writeFileSync(path.join(source, 'index.html'), '<head><link rel="stylesheet" href="style.css"></head><h1>game</h1><script src="mobile-server-config.js"></script><script src="app-update.js"></script>');
+    fs.writeFileSync(path.join(source, 'index.html'), '<head><link rel="stylesheet" href="style.css"></head><h1>game</h1><script src="mobile-server-config.js"></script><script src="app-update.js"></script><script src="char-loadout.js"></script>');
     fs.writeFileSync(path.join(source, 'game.js'), 'console.log("game");');
     fs.writeFileSync(path.join(source, 'assets', 'icon.jpg'), 'icon-bytes');
     fs.mkdirSync(web, { recursive: true });

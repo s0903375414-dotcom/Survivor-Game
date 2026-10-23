@@ -1,4 +1,4 @@
-const CACHE_NAME = 'survivor-game-v9';
+const CACHE_NAME = 'survivor-game-v10';
 const ASSETS = [
   './',
   './index.html',
@@ -17,6 +17,7 @@ const ASSETS = [
   './i18n_dict_6.js',
   './shared_config.js',
   './app-update.js',
+  './char-loadout.js',
   './manifest.json',
   './assets/commander_tutorial.jpg'
 ];

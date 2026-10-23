@@ -1792,6 +1792,7 @@ function loadGachaState() {
     // 開發帳號:直接給 9999 星輝 + 99 召喚券方便測試抽卡
     if (isDevAccount()) {
         gachaState = { diamond: 9999, tickets: 99, warehouse: [], logs: [], pity: {} };
+        charLoadoutState = { equippedId: null };
         return;
     }
     gachaState = { diamond: 0, tickets: 0, warehouse: [], logs: [], pity: {} };
@@ -1808,6 +1809,7 @@ function loadGachaState() {
         try { lsSet(gachaStoreKey('gacha_init'), '1'); } catch (e) { /* ignore */ }
         saveGachaState();
     }
+    loadCharLoadoutState();
 }
 
 function saveGachaState() {
@@ -1820,6 +1822,33 @@ function saveGachaState() {
     } catch (e) { /* localStorage 不可用時忽略 */ }
 }
 
+// ===== 出擊角色系統(角色庫):裝備已獲得角色,依屬性獲得生命/傷害/移速加成 =====
+var charLoadoutState = { equippedId: null };
+let playerCharBonuses = { maxHpBonus: 0, damageMultiplier: 1, speedMultiplier: 1 };
+
+function charLoadoutPrefix() {
+    return currentUser ? `_${currentUser.username}` : '';
+}
+
+function loadCharLoadoutState() {
+    if (typeof CharLoadoutSystem === 'undefined') return;
+    CharLoadoutSystem.load(charLoadoutState, gachaState.warehouse, { prefix: charLoadoutPrefix() });
+}
+
+function saveCharLoadoutState() {
+    if (typeof CharLoadoutSystem === 'undefined') return;
+    CharLoadoutSystem.save(charLoadoutState, { prefix: charLoadoutPrefix() });
+}
+
+// 冪等:同輸入恆同輸出;裝備角色已不在倉庫時自動回退為零加成
+function currentCharBonuses() {
+    const none = { maxHpBonus: 0, damageMultiplier: 1, speedMultiplier: 1 };
+    if (typeof CharLoadoutSystem === 'undefined') return none;
+    const id = CharLoadoutSystem.getEquippedId(charLoadoutState, gachaState.warehouse);
+    if (!id || typeof CHAR_BY_ID === 'undefined' || !CHAR_BY_ID[id]) return none;
+    return CharLoadoutSystem.computeCharacterBonuses(CHAR_BY_ID[id].stats);
+}
+
 // --- 抽卡面板 UI(卡池 v2:常駐/限定分頁、十連、保底進度、動畫結果卡、倉庫) ---
 const gachaModal = document.getElementById('gacha-modal');
 const gachaOpenBtn = document.getElementById('gacha-btn');
@@ -1829,7 +1858,6 @@ const gachaTicketsEl = document.getElementById('gacha-tickets');
 const gachaPullBtn = document.getElementById('gacha-pull-btn');
 const gachaPull10Btn = document.getElementById('gacha-pull10-btn');
 const gachaResultEl = document.getElementById('gacha-result');
-const gachaWarehouseEl = document.getElementById('gacha-warehouse');
 const gachaBannerInfoEl = document.getElementById('gacha-banner-info');
 const gachaTabStandardEl = document.getElementById('gacha-tab-standard');
 const gachaTabLimitedEl = document.getElementById('gacha-tab-limited');
@@ -1849,20 +1877,69 @@ function currentGachaBanner() {
     return GachaSystem.getBanner('standard');
 }
 
-function renderGachaWarehouse() {
-    if (!gachaWarehouseEl) return;
+// --- 角色庫(出擊角色)面板:裝備已獲得角色獲得屬性加成 ---
+function renderCharLibrary() {
+    const grid = document.getElementById('library-grid');
+    if (!grid || typeof CharLoadoutSystem === 'undefined') return;
+    const bar = document.getElementById('char-loadout-bar');
+    const equippedId = CharLoadoutSystem.getEquippedId(charLoadoutState, gachaState.warehouse);
+    if (bar) {
+        const ch = equippedId && typeof CHAR_BY_ID !== 'undefined' ? CHAR_BY_ID[equippedId] : null;
+        if (ch) {
+            const b = CharLoadoutSystem.computeCharacterBonuses(ch.stats);
+            bar.innerHTML = t('當前出擊角色') + '：<span class="char-loadout-name">' + t(ch.name) + '</span>（' + ch.rarity + '）'
+                + '｜' + tf('生命 +{hp}', { hp: b.maxHpBonus })
+                + '｜' + tf('傷害 +{d}%', { d: Math.round((b.damageMultiplier - 1) * 100) })
+                + '｜' + tf('移速 +{s}%', { s: Math.round((b.speedMultiplier - 1) * 100) });
+        } else {
+            bar.textContent = t('尚未裝備出擊角色：從下方選擇一名已獲得的角色，即可依其屬性獲得生命／傷害／移速加成。');
+        }
+    }
     const list = gachaState.warehouse.slice().sort(function (a, b) {
         const ra = (GACHA_RARITY_ORDER[a.rarity] !== undefined) ? GACHA_RARITY_ORDER[a.rarity] : 9;
         const rb = (GACHA_RARITY_ORDER[b.rarity] !== undefined) ? GACHA_RARITY_ORDER[b.rarity] : 9;
         return ra - rb || (b.count || 1) - (a.count || 1);
     });
     const items = list.map(function (c) {
-        return '<div class="gacha-own-card rarity-' + c.rarity + '" data-char-id="' + c.id + '">' + gachaPortraitHTML(c.id, 2)
+        const ch = (typeof CHAR_BY_ID !== 'undefined') ? CHAR_BY_ID[c.id] : null;
+        const equipped = c.id === equippedId;
+        const statsLine = ch ? tf('生命 {hp}｜攻擊 {atk}｜速度 {spd}', { hp: ch.stats.hp, atk: ch.stats.atk, spd: ch.stats.spd }) : '';
+        const skillLine = (ch && ch.skill && ch.skill.name) ? t(ch.skill.name) : '';
+        return '<div class="gacha-own-card library-card rarity-' + c.rarity + (equipped ? ' library-card-equipped' : '') + '" data-char-id="' + c.id + '">'
+            + gachaPortraitHTML(c.id, 2)
             + '<div class="gacha-own-name">' + t(c.name) + '</div>'
             + '<div class="gacha-own-rarity">' + c.rarity + ((c.count || 1) > 1 ? ' ×' + c.count : '') + '</div>'
+            + (statsLine ? '<div class="library-stats">' + statsLine + '</div>' : '')
+            + (skillLine ? '<div class="library-skill">' + t('專屬技能') + '：' + skillLine + '</div>' : '')
+            + '<button class="small-btn library-action-btn" data-equip-id="' + c.id + '">' + (equipped ? t('收回') : t('出擊')) + '</button>'
             + '</div>';
     }).join('');
-    gachaWarehouseEl.innerHTML = items || '<span style="opacity:.5">' + t('尚無角色，擊殺 Boss 取得星輝後即可抽卡') + '</span>';
+    grid.innerHTML = items || '<span class="library-empty">' + t('尚無角色：擊殺 Boss 取得星輝後，到「角色抽卡」召喚角色') + '</span>';
+}
+
+function handleToggleEquipChar(id) {
+    if (typeof CharLoadoutSystem === 'undefined') return;
+    const equippedId = CharLoadoutSystem.getEquippedId(charLoadoutState, gachaState.warehouse);
+    const r = (equippedId === id)
+        ? CharLoadoutSystem.unequipCharacter(charLoadoutState)
+        : CharLoadoutSystem.equipCharacter(charLoadoutState, gachaState.warehouse, id);
+    if (!r.ok) return;
+    saveCharLoadoutState();
+    renderCharLibrary();
+    applyEquippedUnits();
+}
+
+function switchLibraryTab(tab) {
+    const grid = document.getElementById('library-grid');
+    const unitList = document.getElementById('unit-list');
+    const tabChars = document.getElementById('library-tab-chars');
+    const tabUnits = document.getElementById('library-tab-units');
+    const showChars = tab === 'chars';
+    if (grid) grid.classList.toggle('hidden', !showChars);
+    if (unitList) unitList.classList.toggle('hidden', showChars);
+    if (tabChars) tabChars.classList.toggle('active', showChars);
+    if (tabUnits) tabUnits.classList.toggle('active', !showChars);
+    if (showChars) renderCharLibrary(); else renderUnitShop();
 }
 
 function renderGachaPanel() {
@@ -1905,7 +1982,6 @@ function renderGachaPanel() {
             : tf('十連（券 ×{tk} + {cost} 星輝）', { tk: plan10.ticketsUsed, cost: plan10.xinghuiCost });
         gachaPull10Btn.disabled = !plan10.affordable;
     }
-    renderGachaWarehouse();
 }
 
 function openGachaPanel() {
@@ -2039,8 +2115,11 @@ function openCharDetail(charId) {
 
 if (charDetailCloseBtn) charDetailCloseBtn.addEventListener('click', () => { if (charDetailModal) charDetailModal.classList.add('hidden'); });
 if (charDetailModal) charDetailModal.addEventListener('click', (e) => { if (e.target === charDetailModal) charDetailModal.classList.add('hidden'); });
-if (gachaWarehouseEl) gachaWarehouseEl.addEventListener('click', (e) => {
-    const card = e.target.closest('.gacha-own-card');
+const libraryGridEl = document.getElementById('library-grid');
+if (libraryGridEl) libraryGridEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.library-action-btn');
+    if (btn && btn.dataset.equipId) { handleToggleEquipChar(btn.dataset.equipId); return; }
+    const card = e.target.closest('.library-card');
     if (card && card.dataset.charId) openCharDetail(card.dataset.charId);
 });
 if (gachaResultEl) gachaResultEl.addEventListener('click', (e) => {
@@ -2057,13 +2136,15 @@ function applyEquippedUnits() {
         );
         fundsGainMultiplier = bonus.fundsMultiplier;
         playerUpgrades.multishot.level = bonus.multishot; // init() 已重置為 0,此處絕對賦值保持冪等
+        playerCharBonuses = currentCharBonuses(); // 出擊角色加成:絕對賦值保持冪等
         if (player) {
-            player.maxHp = bonus.maxHp;
+            player.maxHp = bonus.maxHp + playerCharBonuses.maxHpBonus;
             if (bonus.fullHeal) player.hp = player.maxHp;
             player.updateUI();
         }
         return;
     }
+    playerCharBonuses = currentCharBonuses();
     fundsGainMultiplier = 1;
     if (equippedUnits.drone) playerUpgrades.multishot.level += 1;
     if (equippedUnits.medic && player) {
@@ -2201,9 +2282,14 @@ setInterval(() => {
     if (unitConfigBtn && unitModal) {
         unitConfigBtn.onclick = () => {
             unitModal.classList.remove('hidden');
+            switchLibraryTab('chars');
             renderUnitShop();
         };
     }
+    const libTabCharsBtn = document.getElementById('library-tab-chars');
+    const libTabUnitsBtn = document.getElementById('library-tab-units');
+    if (libTabCharsBtn) libTabCharsBtn.onclick = () => switchLibraryTab('chars');
+    if (libTabUnitsBtn) libTabUnitsBtn.onclick = () => switchLibraryTab('units');
     if (closeUnitBtn && unitModal) {
         closeUnitBtn.addEventListener('click', () => {
             unitModal.classList.add('hidden');
@@ -2966,7 +3052,7 @@ class MultiplayerManager {
         if (!this.active || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
         if (!this.alive || isPaused) return;
         
-        const baseSpeed = config.playerSpeed * (1 + (this.upgrades.speed * 0.08));
+        const baseSpeed = config.playerSpeed * playerCharBonuses.speedMultiplier * (1 + (this.upgrades.speed * 0.08));
         let dx, dy;
         
         if (controlMode === 'mobile') {
@@ -3422,15 +3508,16 @@ class Player {
     }
 
     update(dt) {
-        // Movement
+        // Movement（出擊角色移速加成:冪等套用）
+        const moveSpeed = config.playerSpeed * playerCharBonuses.speedMultiplier;
         if (controlMode === 'mobile') {
-            this.x += joystickVector.x * config.playerSpeed;
-            this.y += joystickVector.y * config.playerSpeed;
+            this.x += joystickVector.x * moveSpeed;
+            this.y += joystickVector.y * moveSpeed;
         } else {
-            if (keys.w) this.y -= config.playerSpeed;
-            if (keys.s) this.y += config.playerSpeed;
-            if (keys.a) this.x -= config.playerSpeed;
-            if (keys.d) this.x += config.playerSpeed;
+            if (keys.w) this.y -= moveSpeed;
+            if (keys.s) this.y += moveSpeed;
+            if (keys.a) this.x -= moveSpeed;
+            if (keys.d) this.x += moveSpeed;
         }
 
         // Auto Fire
@@ -4764,7 +4851,7 @@ function animate() {
                 // Hit!
                 playSound('hit');
                 createParticles(enemy.x, enemy.y, enemy.color, 3);
-                const damage = config.projectileDamage;
+                const damage = Math.max(1, Math.round(config.projectileDamage * playerCharBonuses.damageMultiplier));
                 enemy.hp -= damage;
                 createFloatingText(enemy.x, enemy.y, `-${damage}`, '#ff4444');
                 projectiles.splice(j, 1);

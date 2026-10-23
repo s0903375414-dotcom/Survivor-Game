@@ -1,10 +1,10 @@
 {
-  "version": "1.2",
-  "versionCode": 4,
-  "notes": "圖鑑立繪顯示修正：修復角色立繪被裁切成半張臉特寫的問題",
+  "version": "1.3",
+  "versionCode": 5,
+  "notes": "新功能：角色庫（出擊角色／支援單位）— 裝備已獲得的角色可獲得生命／傷害／移速加成；原單位配置入口升級為角色庫",
   "apkPath": "releases/survivor-game.apk",
   "apkUrl": "/app/apk",
   "fileName": "survivor-game.apk",
-  "size": 12346379,
-  "releasedAt": "2026-10-23T08:11:55.203Z"
+  "size": 12350662,
+  "releasedAt": "2026-10-23T10:53:15.753Z"
 }

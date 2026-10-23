@@ -7,7 +7,7 @@ const WEB_FILES = [
     'index.html', 'style.css', 'game.js', 'mobile-server-config.js', 'shared_config.js',
     'i18n.js', 'i18n_dict_1.js', 'i18n_dict_2.js', 'i18n_dict_3.js', 'i18n_dict_4.js',
     'i18n_dict_5.js', 'i18n_dict_6.js', 'character.js', 'characters_data.js',
-    'equipment.js', 'gacha.js', 'codex.js', 'manifest.json', 'sw.js', 'app-update.js'
+    'equipment.js', 'gacha.js', 'codex.js', 'manifest.json', 'sw.js', 'app-update.js', 'char-loadout.js'
 ];
 const WEB_DIRECTORIES = ['assets', 'In-game music', 'menu_theme'];
 
@@ -37,6 +37,8 @@ function buildMobileAssets(projectRoot, webDir, files = WEB_FILES, directories =
     if (!html.includes(configTag)) throw new Error('index.html must load mobile-server-config.js.');
     const updateTag = '<script src="app-update.js"></script>';
     if (!html.includes(updateTag)) throw new Error('index.html must load app-update.js.');
+    const loadoutTag = '<script src="char-loadout.js"></script>';
+    if (!html.includes(loadoutTag)) throw new Error('index.html must load char-loadout.js.');
     // Inject the Android flag script into <head> before style.css so the
     // html.android class exists before the first paint (no layout flash),
     // enabling APK-only CSS overrides (e.g. landscape main-menu fix).
