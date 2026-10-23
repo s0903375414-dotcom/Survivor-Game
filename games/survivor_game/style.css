@@ -2382,3 +2382,86 @@ h1 {
     .codex-detail-art img { width: 150px; height: 187px; }
     .codex-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
 }
+
+/* =============================================================
+   [Android APK 專用] 橫向矮螢幕（手機 landscape）主選單修正
+   僅在 html.android（由 build-mobile-assets.js 注入的
+   android-runtime-flag.js 加入此 class）時生效，桌機版不受影響。
+   問題：手機橫向時 viewport 寬度 > 768px，觸發不到上面的
+   max-width: 768px 手機版規則，於是套用桌機佈局——兩個絕對定位
+   的 280px 側面板蓋住中央選單，高度不足又無法捲動，導致底部
+   按鈕被裁切、畫面全部擠在一起。
+   修正：改用與直向手機版一致的堆疊式可捲動佈局並整體緊湊化。
+   ============================================================= */
+@media (orientation: landscape) and (max-height: 500px) {
+    html.android #start-screen {
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        overflow-y: auto;
+        padding: 10px 16px 24px;
+    }
+
+    /* 主選單置頂，側面板脫離絕對定位、改為隨頁面捲動的一般區塊 */
+    html.android .center-content {
+        order: -1;
+        margin-bottom: 12px;
+    }
+
+    html.android .side-panel {
+        position: relative;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-width: 640px;
+        height: auto;
+        margin: 0 auto 12px;
+        padding: 10px 12px;
+    }
+
+    /* 中央內容緊湊化 */
+    html.android .logo-area { margin-bottom: 10px; }
+    html.android .main-logo { font-size: 44px; letter-spacing: 3px; }
+    html.android .sub-logo { font-size: 22px; margin-top: -8px; }
+
+    html.android .stats-boxes { gap: 12px; margin-bottom: 14px; }
+    html.android .stat-box { width: 150px; padding: 8px 10px; }
+    html.android .stat-box .icon { font-size: 16px; margin-bottom: 4px; }
+    html.android .stat-box .label { font-size: 12px; margin-bottom: 2px; }
+    html.android .stat-box .value { font-size: 18px; }
+
+    html.android .menu-actions { gap: 8px; }
+    html.android .action-btn { padding: 10px 16px; font-size: 15px; }
+
+    /* 側面板內部緊湊化，更新日誌限高避免吃掉整個畫面 */
+    html.android .side-panel .panel-header { margin-bottom: 8px; font-size: 12px; }
+    html.android .small-btn { padding: 6px; font-size: 11px; }
+    html.android .changelog-body { max-height: 140px; }
+}
+
+/* =============================================================
+   APK 自動更新提示視窗（僅 APK 內由 app-update.js 動態建立，
+   桌機版不會出現這些元素，零影響）
+   ============================================================= */
+#app-update-modal { z-index: 12000; }
+#app-update-modal .modal-content { width: min(420px, 92vw); text-align: center; }
+#app-update-modal h2 { color: #00ffff; letter-spacing: 2px; margin: 0 0 10px; }
+#app-update-modal .app-update-version-line { color: #aaa; font-size: 14px; margin-bottom: 14px; }
+#app-update-modal .app-update-version-line span { color: #7ee787; font-weight: bold; }
+#app-update-modal .app-update-notes {
+    white-space: pre-wrap;
+    word-break: break-word;
+    text-align: left;
+    font-size: 13px;
+    color: #ccc;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(0, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0 0 18px;
+    max-height: 40vh;
+    overflow-y: auto;
+}
+#app-update-modal .app-update-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+#app-update-modal .app-update-hint { font-size: 12px; color: #ffcc00; margin-top: 12px; min-height: 1em; }

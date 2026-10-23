@@ -1,0 +1,8 @@
+{
+  "appId": "com.survivor.game",
+  "appName": "Survivor Game",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "http"
+  }
+}

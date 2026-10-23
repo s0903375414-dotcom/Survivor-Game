@@ -4,7 +4,83 @@ const fs = require('fs');
 const path = require('path');
 const SharedConfig = require('./shared_config.js');
 
+// APK 自動更新：從 releases/app_release.json 讀取版本資訊。
+// /app/version 供 APK 內的 app-update.js 檢查；/app/apk 下載新版安裝。
+function handleAppReleaseRequest(req, res, routePath) {
+    const commonHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-store',
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups'
+    };
+    const releaseFile = path.join(__dirname, 'releases', 'app_release.json');
+
+    if (routePath === '/app/version') {
+        fs.readFile(releaseFile, 'utf8', (err, data) => {
+            if (err) {
+                res.writeHead(404, { ...commonHeaders, 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: 'no_release' }));
+                return;
+            }
+            let release;
+            try { release = JSON.parse(data); } catch (_) {
+                res.writeHead(500, { ...commonHeaders, 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: 'bad_release_json' }));
+                return;
+            }
+            res.writeHead(200, { ...commonHeaders, 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+                version: release.version,
+                versionCode: release.versionCode,
+                notes: release.notes || '',
+                apkUrl: release.apkUrl || '/app/apk'
+            }));
+        });
+        return;
+    }
+
+    // /app/apk：串流 releases/ 內的 APK 檔案
+    fs.readFile(releaseFile, 'utf8', (err, data) => {
+        if (err) {
+            res.writeHead(404, { ...commonHeaders, 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ error: 'no_release' }));
+            return;
+        }
+        let release;
+        try { release = JSON.parse(data); } catch (_) {
+            res.writeHead(500, { ...commonHeaders, 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ error: 'bad_release_json' }));
+            return;
+        }
+        const apkPath = path.resolve(__dirname, String(release.apkPath || ''));
+        if (!apkPath.startsWith(__dirname + path.sep)) {
+            res.writeHead(403, { ...commonHeaders, 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('403 Forbidden');
+            return;
+        }
+        fs.stat(apkPath, (statErr, st) => {
+            if (statErr || !st.isFile()) {
+                res.writeHead(404, { ...commonHeaders, 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('404 Not Found');
+                return;
+            }
+            res.writeHead(200, {
+                ...commonHeaders,
+                'Content-Type': 'application/vnd.android-package-archive',
+                'Content-Length': st.size
+            });
+            fs.createReadStream(apkPath).pipe(res);
+        });
+    });
+}
+
 const server = http.createServer((req, res) => {
+    // APK 自動更新端點（優先於靜態檔案）
+    const routePath = (req.url || '').split('?')[0];
+    if (routePath === '/app/version' || routePath === '/app/apk') {
+        handleAppReleaseRequest(req, res, routePath);
+        return;
+    }
+
     let filePath = req.url === '/' ? '/index.html' : req.url;
     filePath = decodeURIComponent(filePath.split('?')[0]);
     const fullPath = path.join(__dirname, filePath);

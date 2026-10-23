@@ -7,12 +7,19 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "android:assets": "node scripts/build-mobile-assets.js",
+    "android:sync": "npm run android:assets && npx cap sync android",
+    "android:apk": "build-android.bat",
+    "android:release": "node scripts/release-apk.js"
   },
   "dependencies": {
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
   },
