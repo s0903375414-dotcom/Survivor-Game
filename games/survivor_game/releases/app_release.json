@@ -1,10 +1,10 @@
 {
-  "version": "1.1",
-  "versionCode": 2,
-  "notes": "主選單橫向顯示修正；內建自動更新機制（伺服器推播新版本）",
+  "version": "1.2",
+  "versionCode": 4,
+  "notes": "圖鑑立繪顯示修正：修復角色立繪被裁切成半張臉特寫的問題",
   "apkPath": "releases/survivor-game.apk",
   "apkUrl": "/app/apk",
   "fileName": "survivor-game.apk",
-  "size": 12346171,
-  "releasedAt": "2026-10-23T02:49:16.379Z"
+  "size": 12346379,
+  "releasedAt": "2026-10-23T08:11:55.203Z"
 }
