@@ -1,4 +1,4 @@
-const CACHE_NAME = 'survivor-game-v8';
+const CACHE_NAME = 'survivor-game-v9';
 const ASSETS = [
   './',
   './index.html',

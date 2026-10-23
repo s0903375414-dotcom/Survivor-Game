@@ -383,7 +383,9 @@
         var cv = document.createElement('canvas');
         cv.width = AR_W * SS; cv.height = AR_H * SS;
         var ctx = cv.getContext('2d');
-        ctx.scale(SS, SS);
+        // 注意:drawArt 本身就以 1024×1280(=512×640 的 2× 超取樣)座標繪製,
+        // 這裡「不可」再 ctx.scale(SS,SS),否則座標系被壓成 512×640,
+        // 圖會溢出只剩左上角(角色被切成右緣半臉特寫)。
         drawArt(ctx, ch, rarity);
         var out = document.createElement('canvas');
         out.width = width || AR_W;
