@@ -1849,6 +1849,12 @@ function currentCharBonuses() {
     return CharLoadoutSystem.computeCharacterBonuses(CHAR_BY_ID[id].stats);
 }
 
+// 目前裝備的出擊角色 id(供遊戲內玩家模型切換;未裝備回 null = 預設外觀)
+function getEquippedLoadoutCharId() {
+    if (typeof CharLoadoutSystem === 'undefined') return null;
+    return CharLoadoutSystem.getEquippedId(charLoadoutState, gachaState.warehouse) || null;
+}
+
 // --- 抽卡面板 UI(卡池 v2:常駐/限定分頁、十連、保底進度、動畫結果卡、倉庫) ---
 const gachaModal = document.getElementById('gacha-modal');
 const gachaOpenBtn = document.getElementById('gacha-btn');
@@ -2000,12 +2006,19 @@ function selectGachaBanner(kind) {
 function renderGachaResults(results) {
     if (!gachaResultEl) return;
     gachaResultEl.innerHTML = '';
+    // 稀有度揭示閃光:先以本次最高稀有度的顏色爆閃,再翻出卡片
+    const RARITY_ORDER = { SSR: 0, SR: 1, R: 2, N: 3 };
+    const best = results.reduce(function (b, r) { return (RARITY_ORDER[r.rarity] < RARITY_ORDER[b]) ? r.rarity : b; }, 'N');
+    const REVEAL_MS = 520;
+    const reveal = document.createElement('div');
+    reveal.className = 'gacha-reveal reveal-' + best;
+    gachaResultEl.appendChild(reveal);
     const wrap = document.createElement('div');
     wrap.className = 'gacha-cards';
     let maxDelay = 0;
     results.forEach(function (r, i) {
         const card = document.createElement('div');
-        const delay = Math.min(i * 110, 1210);
+        const delay = REVEAL_MS + Math.min(i * 110, 1210);
         card.className = 'gacha-card rarity-' + r.rarity + ((r.rarity === 'SSR') ? ' ssr-card' : '');
         card.dataset.charId = r.char.id;
         card.style.animationDelay = delay + 'ms';
@@ -3468,7 +3481,7 @@ class Player {
         this.diamond = (typeof GachaSystem !== 'undefined') ? GachaSystem.getBalance(gachaState) : 0;  // 星輝餘額即時讀取
         this.lastShotTime = 0;
         // === 可互動角色系統:動畫狀態機 ===
-        this.anim = new CharacterAnim();
+        this.anim = new CharacterAnim(getEquippedLoadoutCharId());
         this.prevX = x;
         this.prevY = y;
         this.aimAngle = 0;

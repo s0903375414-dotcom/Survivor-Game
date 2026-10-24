@@ -18,6 +18,12 @@
             b = Math.floor(parseInt(hex.slice(5, 7), 16) * f);
         return 'rgb(' + r + ',' + g + ',' + b + ')';
     }
+    function lighten(hex, f) {
+        var r = Math.min(255, Math.floor(parseInt(hex.slice(1, 3), 16) * f)),
+            g = Math.min(255, Math.floor(parseInt(hex.slice(3, 5), 16) * f)),
+            b = Math.min(255, Math.floor(parseInt(hex.slice(5, 7), 16) * f));
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
     function vGrad(ctx, x0, y0, x1, y1, c0, c1) {
         var g = ctx.createLinearGradient(x0, y0, x1, y1);
         g.addColorStop(0, c0); g.addColorStop(1, c1);
@@ -38,7 +44,7 @@
         ctx.restore();
     }
 
-    function drawArt(ctx, ch, rarity) {
+    function drawArtLegacy(ctx, ch, rarity) { // 舊版繪製(2026-10 v2 重繪後保留參考)
         var P = ch.palette;
         var cx = 512, W = 1024, H = 1280;
 
@@ -366,6 +372,482 @@
         ctx.beginPath();
         ctx.moveTo(cx + 150, 705);
         ctx.bezierCurveTo(cx + 176, 832, cx + 240, 1080, cx + 268, 1280);
+        ctx.stroke();
+        ctx.restore();
+
+        // ---------- 暗角 ----------
+        var vig = ctx.createRadialGradient(cx, 560, 380, cx, 560, 900);
+        vig.addColorStop(0, 'rgba(0,0,0,0)');
+        vig.addColorStop(1, 'rgba(0,0,0,0.5)');
+        ctx.fillStyle = vig;
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    // ============================================================
+    // drawArt v2 (2026-10 重繪)
+    // 目標:可愛動漫風五官(眼睛縮小/視線一致/瀏海不壓眼)、明確的肩線手臂、
+    // S 曲線髮流,並依角色 id 雜湊差異化:眼型/嘴型/瀏海/配件/衣領。
+    // ============================================================
+    function hashSeed(str) {
+        var h = 2166136261;
+        str = String(str || '');
+        for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = (h * 16777619) >>> 0; }
+        return h >>> 0;
+    }
+
+    function drawArt(ctx, ch, rarity) {
+        var P = ch.palette;
+        var cx = 512, W = 1024, H = 1280;
+        var seed = hashSeed(ch.id);
+        var eyeShape = seed % 3;              // 0 圓眼 1 杏眼 2 微上揚
+        var mouthType = (seed >>> 3) % 3;     // 0 微笑 1 開口笑 2 貓嘴
+        var bangType = (seed >>> 6) % 3;      // 0 柔和瀏海 1 窗簾瀏海 2 公主瀏海
+        var accessory = (seed >>> 9) % 4;     // 0 無 1 呆毛 2 髮夾 3 側蝴蝶結
+        var collarType = (seed >>> 12) % 3;   // 0 水手領 1 蝴蝶結領 2 圍巾領
+
+        // ---------- 背景 ----------
+        ctx.fillStyle = vGrad(ctx, 0, 0, 0, H, '#151322', '#0d0c17');
+        ctx.fillRect(0, 0, W, H);
+        var rarColor = { N: '#8b9aa9', R: '#4aa3ff', SR: '#c07bff', SSR: '#ffd700' }[rarity] || '#8b9aa9';
+        var bgGlow = ctx.createRadialGradient(cx, 470, 60, cx, 470, 620);
+        bgGlow.addColorStop(0, hexA(rarColor, 0.30));
+        bgGlow.addColorStop(0.55, hexA(P.outfit, 0.16));
+        bgGlow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = bgGlow;
+        ctx.fillRect(0, 0, W, H);
+        ctx.save();
+        ctx.globalAlpha = 0.20;
+        ctx.strokeStyle = rarColor;
+        ctx.lineWidth = 10;
+        ctx.beginPath(); ctx.arc(cx, 470, 330, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 0.10;
+        ctx.lineWidth = 26;
+        ctx.beginPath(); ctx.arc(cx, 470, 380, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.globalAlpha = 0.06;
+        ctx.fillStyle = '#ffffff';
+        for (var ray = -2; ray <= 2; ray++) {
+            ctx.save();
+            ctx.translate(cx + ray * 150, 0);
+            ctx.rotate(ray * 0.12 + 0.5);
+            ctx.fillRect(-30, -260, 60, 1500);
+            ctx.restore();
+        }
+        ctx.restore();
+        drawStar(ctx, 200, 250, 34, '#ffffff', 0.85);
+        drawStar(ctx, 840, 190, 22, rarColor, 0.9);
+        drawStar(ctx, 880, 520, 14, '#ffffff', 0.65);
+        drawStar(ctx, 130, 620, 12, rarColor, 0.6);
+        drawStar(ctx, 760, 880, 18, '#ffffff', 0.35);
+        ctx.fillStyle = vGrad(ctx, 0, H - 300, 0, H, 'rgba(0,0,0,0)', hexA(rarColor, 0.22));
+        ctx.fillRect(0, H - 300, W, 300);
+
+        var hairG = vGrad(ctx, 0, 220, 0, 1080, P.hair, darken(P.hairDark, 0.9));
+        var hairDK = darken(P.hairDark, 0.82);
+
+        // ---------- 後髮(身體底層,S 曲線髮流) ----------
+        ctx.save();
+        ctx.fillStyle = hairG;
+        if (ch.hairStyle === 'long') {
+            [-1, 1].forEach(function (s) {
+                ctx.beginPath();
+                ctx.moveTo(cx + s * 120, 330);
+                ctx.bezierCurveTo(cx + s * 235, 430, cx + s * 205, 720, cx + s * 238, 985);
+                ctx.bezierCurveTo(cx + s * 248, 1070, cx + s * 210, 1105, cx + s * 176, 1088);
+                ctx.bezierCurveTo(cx + s * 140, 1010, cx + s * 158, 700, cx + s * 108, 470);
+                ctx.bezierCurveTo(cx + s * 96, 400, cx + s * 92, 352, cx + s * 120, 330);
+                ctx.closePath(); ctx.fill();
+                // 髮束光帶
+                ctx.globalAlpha = 0.18; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 12; ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(cx + s * 168, 430);
+                ctx.bezierCurveTo(cx + s * 198, 650, cx + s * 178, 850, cx + s * 205, 1000);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            });
+            // 後方髮底
+            ctx.beginPath();
+            ctx.moveTo(cx - 160, 380);
+            ctx.bezierCurveTo(cx - 200, 640, cx - 150, 860, cx, 940);
+            ctx.bezierCurveTo(cx + 150, 860, cx + 200, 640, cx + 160, 380);
+            ctx.closePath(); ctx.fill();
+        } else if (ch.hairStyle === 'twin') {
+            [-1, 1].forEach(function (s) {
+                // 側髮
+                ctx.beginPath();
+                ctx.moveTo(cx + s * 140, 360);
+                ctx.bezierCurveTo(cx + s * 200, 470, cx + s * 178, 640, cx + s * 150, 800);
+                ctx.quadraticCurveTo(cx + s * 120, 830, cx + s * 112, 790);
+                ctx.bezierCurveTo(cx + s * 128, 610, cx + s * 118, 470, cx + s * 96, 420);
+                ctx.closePath(); ctx.fill();
+                // 馬尾(波浪 S 型)
+                ctx.beginPath();
+                ctx.moveTo(cx + s * 150, 320);
+                ctx.bezierCurveTo(cx + s * 250, 380, cx + s * 210, 520, cx + s * 262, 640);
+                ctx.bezierCurveTo(cx + s * 300, 720, cx + s * 240, 760, cx + s * 218, 860);
+                ctx.bezierCurveTo(cx + s * 210, 940, cx + s * 160, 950, cx + s * 152, 880);
+                ctx.bezierCurveTo(cx + s * 150, 770, cx + s * 200, 700, cx + s * 178, 600);
+                ctx.bezierCurveTo(cx + s * 160, 520, cx + s * 130, 440, cx + s * 118, 360);
+                ctx.closePath(); ctx.fill();
+                // 髮束
+                ctx.strokeStyle = hairDK; ctx.lineWidth = 16; ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(cx + s * 148, 336); ctx.lineTo(cx + s * 178, 350);
+                ctx.stroke();
+                ctx.globalAlpha = 0.16; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 10;
+                ctx.beginPath();
+                ctx.moveTo(cx + s * 232, 520); ctx.quadraticCurveTo(cx + s * 248, 660, cx + s * 234, 800);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            });
+        } else if (ch.hairStyle === 'bun') {
+            ctx.beginPath();
+            ctx.moveTo(cx - 150, 380);
+            ctx.bezierCurveTo(cx - 185, 600, cx - 130, 780, cx, 830);
+            ctx.bezierCurveTo(cx + 130, 780, cx + 185, 600, cx + 150, 380);
+            ctx.closePath(); ctx.fill();
+            // 髮髻(高置大圓 + 底部髮圈,清楚可辨是包頭)
+            ctx.beginPath(); ctx.ellipse(cx, 152, 95, 70, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = hairDK;
+            ctx.beginPath(); ctx.ellipse(cx, 198, 66, 20, 0, 0, Math.PI * 2); ctx.fill();
+            // 單條綁髮弧線
+            ctx.strokeStyle = hairDK; ctx.lineWidth = 9; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(cx - 56, 134); ctx.quadraticCurveTo(cx, 182, cx + 56, 134); ctx.stroke();
+            // 髮髻光澤
+            ctx.globalAlpha = 0.22; ctx.fillStyle = '#ffffff';
+            ctx.beginPath(); ctx.ellipse(cx - 30, 122, 32, 15, -0.5, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1;
+        } else { // short — 鮑伯頭
+            ctx.beginPath();
+            ctx.moveTo(cx - 130, 350);
+            ctx.bezierCurveTo(cx - 190, 430, cx - 182, 560, cx - 150, 660);
+            ctx.quadraticCurveTo(cx - 120, 690, cx - 96, 672);
+            ctx.bezierCurveTo(cx - 118, 560, cx - 112, 470, cx - 92, 420);
+            ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(cx + 130, 350);
+            ctx.bezierCurveTo(cx + 190, 430, cx + 182, 560, cx + 150, 660);
+            ctx.quadraticCurveTo(cx + 120, 690, cx + 96, 672);
+            ctx.bezierCurveTo(cx + 118, 560, cx + 112, 470, cx + 92, 420);
+            ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(cx - 152, 372);
+            ctx.bezierCurveTo(cx - 196, 560, cx - 158, 640, cx, 668);
+            ctx.bezierCurveTo(cx + 158, 640, cx + 196, 560, cx + 152, 372);
+            ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+
+        // ---------- 身體:脖子/肩線/手臂/裙身 ----------
+        // 脖子(帶陰影)
+        ctx.fillStyle = vGrad(ctx, 0, 620, 0, 710, darken(P.skin, 0.94), darken(P.skin, 0.8));
+        ctx.beginPath();
+        ctx.moveTo(cx - 34, 630); ctx.lineTo(cx + 34, 630);
+        ctx.quadraticCurveTo(cx + 30, 672, cx + 40, 700);
+        ctx.lineTo(cx - 40, 700); ctx.quadraticCurveTo(cx - 30, 672, cx - 34, 630);
+        ctx.closePath(); ctx.fill();
+
+        var dressG = vGrad(ctx, 0, 700, 0, 1280, P.outfit, darken(P.outfitDark, 0.72));
+
+        // 裙身:上身合腰 → A 字裙擺
+        ctx.fillStyle = dressG;
+        ctx.beginPath();
+        ctx.moveTo(cx - 112, 706);
+        ctx.bezierCurveTo(cx - 128, 760, cx - 122, 830, cx - 108, 900);   // 左腰
+        ctx.bezierCurveTo(cx - 190, 960, cx - 252, 1090, cx - 268, 1280);  // 左裙擺
+        ctx.lineTo(cx + 268, 1280);
+        ctx.bezierCurveTo(cx + 252, 1090, cx + 190, 960, cx + 108, 900);  // 右裙擺
+        ctx.bezierCurveTo(cx + 122, 830, cx + 128, 760, cx + 112, 706);   // 右腰
+        ctx.bezierCurveTo(cx + 60, 690, cx - 60, 690, cx - 112, 706);      // 肩領口
+        ctx.closePath(); ctx.fill();
+        // 腰帶
+        ctx.fillStyle = darken(P.outfitDark, 0.75);
+        ctx.fillRect(cx - 112, 878, 224, 26);
+        // 裙褶陰影(兩道柔和陰影)
+        ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = darken(P.outfitDark, 0.55);
+        [-90, 90].forEach(function (dx) {
+            ctx.beginPath();
+            ctx.moveTo(cx + dx * 0.7, 940);
+            ctx.quadraticCurveTo(cx + dx, 1100, cx + dx * 1.6, 1280);
+            ctx.quadraticCurveTo(cx + dx * 1.6 + 26, 1280, cx + dx * 1.6 + 30, 1272);
+            ctx.quadraticCurveTo(cx + dx + 30, 1100, cx + dx * 0.7 + 24, 942);
+            ctx.closePath(); ctx.fill();
+        });
+        ctx.restore();
+
+        // 手臂(袖) — 畫在裙身之後,袖/手自然垂在裙側前方
+        [-1, 1].forEach(function (s) {
+            var sleeveG = vGrad(ctx, 0, 742, 0, 1040, darken(P.outfit, 0.94), darken(P.outfitDark, 0.78));
+            ctx.fillStyle = sleeveG;
+            ctx.beginPath();
+            ctx.moveTo(cx + s * 108, 742);
+            ctx.bezierCurveTo(cx + s * 176, 764, cx + s * 208, 880, cx + s * 198, 1010);
+            ctx.lineTo(cx + s * 152, 1014);
+            ctx.bezierCurveTo(cx + s * 158, 900, cx + s * 136, 812, cx + s * 96, 790);
+            ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = darken(P.outfitDark, 0.6); ctx.lineWidth = 5;
+            ctx.stroke();
+            // 袖口
+            ctx.fillStyle = darken(P.outfitDark, 0.8);
+            ctx.beginPath();
+            ctx.ellipse(cx + s * 175, 1002, 28, 16, s * 0.12, 0, Math.PI * 2);
+            ctx.fill();
+            // 手
+            ctx.fillStyle = P.skin;
+            ctx.beginPath();
+            ctx.ellipse(cx + s * 175, 1040, 22, 26, 0, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // 衣領(依 collarType 差異化)
+        ctx.fillStyle = '#f5f6fa';
+        if (collarType === 0) { // 水手領
+            ctx.beginPath();
+            ctx.moveTo(cx - 96, 702);
+            ctx.quadraticCurveTo(cx, 742, cx + 96, 702);
+            ctx.lineTo(cx + 118, 766);
+            ctx.quadraticCurveTo(cx, 820, cx - 118, 766);
+            ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = darken(P.outfitDark, 0.9); ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.moveTo(cx - 104, 700); ctx.quadraticCurveTo(cx, 738, cx + 104, 700); ctx.stroke();
+        } else if (collarType === 1) { // 蝴蝶結領
+            ctx.beginPath();
+            ctx.moveTo(cx - 92, 706);
+            ctx.quadraticCurveTo(cx, 760, cx + 92, 706);
+            ctx.quadraticCurveTo(cx + 66, 800, cx, 812);
+            ctx.quadraticCurveTo(cx - 66, 800, cx - 92, 706);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = P.hair;
+            ctx.beginPath();
+            ctx.moveTo(cx, 800); ctx.lineTo(cx - 58, 766); ctx.quadraticCurveTo(cx - 72, 802, cx - 58, 838); ctx.lineTo(cx, 822);
+            ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(cx, 800); ctx.lineTo(cx + 58, 766); ctx.quadraticCurveTo(cx + 72, 802, cx + 58, 838); ctx.lineTo(cx, 822);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = darken(P.hairDark, 0.8);
+            ctx.beginPath(); ctx.ellipse(cx, 812, 15, 18, 0, 0, Math.PI * 2); ctx.fill();
+        } else { // 圍巾領
+            ctx.beginPath();
+            ctx.moveTo(cx - 100, 704);
+            ctx.quadraticCurveTo(cx, 756, cx + 100, 704);
+            ctx.quadraticCurveTo(cx + 84, 806, cx, 830);
+            ctx.quadraticCurveTo(cx - 84, 806, cx - 100, 704);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = darken(P.hair, 0.92);
+            ctx.beginPath();
+            ctx.moveTo(cx + 30, 806); ctx.lineTo(cx + 96, 850); ctx.lineTo(cx + 60, 878); ctx.lineTo(cx + 18, 836);
+            ctx.closePath(); ctx.fill();
+        }
+
+        // ---------- 臉(更圓潤的下巴線) ----------
+        var faceG = ctx.createRadialGradient(cx, 420, 40, cx, 460, 220);
+        faceG.addColorStop(0, '#fff2f0');
+        faceG.addColorStop(0.5, P.skin);
+        faceG.addColorStop(1, darken(P.skin, 0.88));
+        ctx.fillStyle = faceG;
+        ctx.beginPath();
+        ctx.moveTo(cx - 150, 415);
+        ctx.bezierCurveTo(cx - 154, 300, cx - 92, 242, cx, 242);
+        ctx.bezierCurveTo(cx + 92, 242, cx + 154, 300, cx + 150, 415);
+        ctx.bezierCurveTo(cx + 146, 520, cx + 108, 610, cx, 650);
+        ctx.bezierCurveTo(cx - 108, 610, cx - 146, 520, cx - 150, 415);
+        ctx.closePath(); ctx.fill();
+        // 耳朵
+        [-1, 1].forEach(function (s) {
+            ctx.beginPath();
+            ctx.ellipse(cx + s * 148, 480, 20, 34, 0, 0, Math.PI * 2);
+            ctx.fillStyle = darken(P.skin, 0.93); ctx.fill();
+        });
+
+        // ---------- 五官 ----------
+        // 眉(細而柔和)
+        ctx.strokeStyle = darken(P.hairDark, 0.72); ctx.lineWidth = 8; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(cx - 100, 462); ctx.quadraticCurveTo(cx - 74, 450, cx - 48, 458); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx + 100, 462); ctx.quadraticCurveTo(cx + 74, 450, cx + 48, 458); ctx.stroke();
+
+        // 眼睛(左右對稱、視線一致;瀏海底 435 與眼頂 470 保持距離)
+        var eyeY = 512, eyeDX = 86;
+        function eyeV2(ex) {
+            var tilt = (eyeShape === 2) ? 0.16 : (eyeShape === 1 ? 0.08 : 0);
+            var ry = (eyeShape === 1) ? 30 : 34;
+            var rx = 34;
+            ctx.save();
+            ctx.translate(ex, eyeY);
+            ctx.rotate(tilt * (ex < cx ? -1 : 1) * -1); // 外角微揚
+            // 眼白
+            ctx.fillStyle = '#fbfcff';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // 虹膜(上方亮的放射漸層)
+            var iris = ctx.createRadialGradient(-4, -8, 4, 0, 0, 30);
+            iris.addColorStop(0, lighten(P.eye, 1.45));
+            iris.addColorStop(0.55, P.eye);
+            iris.addColorStop(1, darken(P.eye, 0.45));
+            ctx.fillStyle = iris;
+            ctx.beginPath();
+            ctx.ellipse(0, 2, 25, 27, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // 瞳孔(兩眼注視同一方向)
+            ctx.fillStyle = '#221a33';
+            ctx.beginPath();
+            ctx.ellipse(-2, 4, 12, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // 高光(大 + 小,兩眼一致)
+            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+            ctx.beginPath(); ctx.ellipse(-10, -10, 9, 11, -0.4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.55)';
+            ctx.beginPath(); ctx.ellipse(12, 12, 5, 6, 0.3, 0, Math.PI * 2); ctx.fill();
+            // 上睫毛(輕薄曲線,外角小翼)
+            ctx.strokeStyle = '#241d33'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-rx + 4, -ry + 8);
+            ctx.quadraticCurveTo(-10, -ry - 4, rx - 14, -ry + 4);
+            ctx.stroke();
+            // 下眼線(淡)
+            ctx.strokeStyle = 'rgba(36,29,51,0.28)'; ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(-20, ry - 3);
+            ctx.quadraticCurveTo(0, ry + 4, 22, ry - 5);
+            ctx.stroke();
+            ctx.restore();
+        }
+        eyeV2(cx - eyeDX);
+        eyeV2(cx + eyeDX);
+
+        // 鼻(小而可辨)
+        ctx.strokeStyle = 'rgba(150,90,90,0.5)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(cx - 4, 566); ctx.quadraticCurveTo(cx + 4, 576, cx - 2, 580); ctx.stroke();
+
+        // 嘴(依 mouthType 差異化,尺寸加大)
+        ctx.strokeStyle = '#c4566b'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+        if (mouthType === 0) { // 微笑
+            ctx.beginPath(); ctx.moveTo(cx - 30, 602); ctx.quadraticCurveTo(cx, 622, cx + 30, 602); ctx.stroke();
+        } else if (mouthType === 1) { // 開口笑
+            ctx.fillStyle = '#c4566b';
+            ctx.beginPath();
+            ctx.moveTo(cx - 26, 600);
+            ctx.quadraticCurveTo(cx, 594, cx + 26, 600);
+            ctx.quadraticCurveTo(cx, 636, cx - 26, 600);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#e88a9a';
+            ctx.beginPath(); ctx.ellipse(cx, 626, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
+        } else { // 貓嘴
+            ctx.beginPath(); ctx.moveTo(cx - 24, 602); ctx.quadraticCurveTo(cx - 10, 616, cx, 604); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx + 24, 602); ctx.quadraticCurveTo(cx + 10, 616, cx, 604); ctx.stroke();
+        }
+
+        // 腮紅(眼下外側 + 斜線光暈)
+        [-1, 1].forEach(function (s) {
+            var blush = ctx.createRadialGradient(cx + s * 118, 566, 4, cx + s * 118, 566, 40);
+            blush.addColorStop(0, 'rgba(242,140,150,0.34)');
+            blush.addColorStop(1, 'rgba(242,140,150,0)');
+            ctx.fillStyle = blush;
+            ctx.beginPath(); ctx.ellipse(cx + s * 118, 566, 38, 26, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(242,140,150,0.5)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+            for (var b = 0; b < 3; b++) {
+                ctx.beginPath();
+                ctx.moveTo(cx + s * (100 + b * 12), 552);
+                ctx.lineTo(cx + s * (94 + b * 12), 578);
+                ctx.stroke();
+            }
+        });
+
+        // ---------- 瀏海(依 bangType;底端 435,不壓眼) ----------
+        ctx.fillStyle = hairG;
+        if (bangType === 0) { // 柔和圓弧瀏海
+            ctx.beginPath();
+            ctx.moveTo(cx - 154, 412);
+            ctx.bezierCurveTo(cx - 158, 296, cx - 96, 232, cx, 230);
+            ctx.bezierCurveTo(cx + 96, 232, cx + 158, 296, cx + 154, 412);
+            ctx.bezierCurveTo(cx + 130, 380, cx + 104, 372, cx + 88, 396);
+            ctx.quadraticCurveTo(cx + 78, 414, cx + 60, 434);
+            ctx.quadraticCurveTo(cx + 44, 404, cx + 34, 392);
+            ctx.quadraticCurveTo(cx + 22, 412, cx + 8, 434);
+            ctx.quadraticCurveTo(cx - 10, 404, cx - 26, 394);
+            ctx.quadraticCurveTo(cx - 40, 416, cx - 56, 434);
+            ctx.quadraticCurveTo(cx - 72, 406, cx - 92, 398);
+            ctx.quadraticCurveTo(cx - 122, 380, cx - 154, 412);
+            ctx.closePath(); ctx.fill();
+        } else if (bangType === 1) { // 窗簾瀏海(中分)
+            ctx.beginPath();
+            ctx.moveTo(cx - 154, 415);
+            ctx.bezierCurveTo(cx - 158, 296, cx - 96, 232, cx, 230);
+            ctx.bezierCurveTo(cx + 96, 232, cx + 158, 296, cx + 154, 415);
+            ctx.quadraticCurveTo(cx + 120, 330, cx + 62, 306);
+            ctx.quadraticCurveTo(cx + 26, 300, cx + 4, 316);
+            ctx.quadraticCurveTo(cx - 26, 300, cx - 62, 306);
+            ctx.quadraticCurveTo(cx - 120, 330, cx - 154, 415);
+            ctx.closePath(); ctx.fill();
+        } else { // 公主瀏海(平瀏海 + 整齊弧緣)
+            ctx.beginPath();
+            ctx.moveTo(cx - 154, 408);
+            ctx.bezierCurveTo(cx - 158, 296, cx - 96, 232, cx, 230);
+            ctx.bezierCurveTo(cx + 96, 232, cx + 158, 296, cx + 154, 408);
+            ctx.quadraticCurveTo(cx + 130, 420, cx + 104, 424);
+            ctx.quadraticCurveTo(cx + 70, 430, cx + 36, 424);
+            ctx.quadraticCurveTo(cx + 12, 421, cx, 424);
+            ctx.quadraticCurveTo(cx - 36, 430, cx - 70, 424);
+            ctx.quadraticCurveTo(cx - 104, 420, cx - 130, 422);
+            ctx.quadraticCurveTo(cx - 142, 416, cx - 154, 408);
+            ctx.closePath(); ctx.fill();
+        }
+        // 鬢角(框臉長瀏,尖端柔順)
+        [-1, 1].forEach(function (s) {
+            ctx.beginPath();
+            ctx.moveTo(cx + s * 150, 400);
+            ctx.bezierCurveTo(cx + s * 172, 470, cx + s * 160, 590, cx + s * 122, 706);
+            ctx.quadraticCurveTo(cx + s * 92, 716, cx + s * 88, 662);
+            ctx.bezierCurveTo(cx + s * 112, 566, cx + s * 112, 470, cx + s * 96, 412);
+            ctx.closePath(); ctx.fill();
+        });
+        // 頂部髮絲高光
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 12; ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx - 104, 302);
+        ctx.quadraticCurveTo(cx, 252, cx + 104, 302);
+        ctx.stroke();
+        ctx.restore();
+
+        // ---------- 配件(依 accessory) ----------
+        if (accessory === 1) { // 呆毛
+            ctx.strokeStyle = P.hair; ctx.lineWidth = 14; ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(cx - 12, 236);
+            ctx.bezierCurveTo(cx - 40, 170, cx + 44, 150, cx + 58, 196);
+            ctx.stroke();
+        } else if (accessory === 2) { // 髮夾(星形,取瞳色)
+            drawStar(ctx, cx - 96, 330, 22, P.eye, 0.95);
+            ctx.strokeStyle = lighten(P.eye, 1.2); ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(cx - 118, 344); ctx.lineTo(cx - 74, 344); ctx.stroke();
+        } else if (accessory === 3) { // 側蝴蝶結
+            var bx = cx + 118, by = 320;
+            ctx.fillStyle = lighten(P.eye, 1.1);
+            ctx.beginPath();
+            ctx.moveTo(bx, by); ctx.lineTo(bx + 46, by - 24); ctx.quadraticCurveTo(bx + 58, by + 4, bx + 46, by + 30); ctx.lineTo(bx, by + 12);
+            ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(bx, by); ctx.lineTo(bx - 46, by - 24); ctx.quadraticCurveTo(bx - 58, by + 4, bx - 46, by + 30); ctx.lineTo(bx, by + 12);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = darken(P.eye, 0.7);
+            ctx.beginPath(); ctx.ellipse(bx, by + 6, 12, 14, 0, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // ---------- 輪廓光(右側 rim light) ----------
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.moveTo(cx + 152, 400);
+        ctx.bezierCurveTo(cx + 158, 300, cx + 96, 236, cx, 234);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + 176, 760);
+        ctx.bezierCurveTo(cx + 208, 880, cx + 252, 1080, cx + 268, 1280);
         ctx.stroke();
         ctx.restore();
 

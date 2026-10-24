@@ -26,7 +26,7 @@
     var FPS = { idle: 6, run: 12, hurt: 10, dead: 8 };  // 每狀態幀率
     var DIRS = ['down', 'up', 'left', 'right'];
 
-    var sheet = null;   // 快取的離屏 canvas
+    var sheetCache = {};   // charId -> sprite sheet 快取(v2:每個角色專屬模型)
 
     // 像素繪製輔助:px(ctx, x, y, w, h, color) — 以 1px 為單位畫矩形
     function px(c, x, y, w, h, color) {
@@ -34,9 +34,34 @@
         c.fillRect(x, y, w, h);
     }
 
+    // hex 加深/提亮小工具
+    function shade(hex, f) {
+        var r = Math.max(0, Math.min(255, Math.floor(parseInt(hex.slice(1, 3), 16) * f)));
+        var g = Math.max(0, Math.min(255, Math.floor(parseInt(hex.slice(3, 5), 16) * f)));
+        var b = Math.max(0, Math.min(255, Math.floor(parseInt(hex.slice(5, 7), 16) * f)));
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+
+    // 由 CHARACTERS 的 palette 轉成 sprite 配色
+    function paletteFromChar(ch) {
+        var p = ch.palette || {};
+        return {
+            hair: p.hair || PALETTE.hair,
+            hairDark: p.hairDark || shade(p.hair || PALETTE.hair, 0.72),
+            skin: p.skin || PALETTE.skin,
+            skinShadow: shade(p.skin || PALETTE.skin, 0.92),
+            dress: p.outfit || PALETTE.dress,
+            dressDark: p.outfitDark || shade(p.outfit || PALETTE.dress, 0.75),
+            boots: p.boots || PALETTE.boots,
+            bootsDark: shade(p.boots || PALETTE.boots, 0.75),
+            outline: '#182c4f',
+            eye: p.eye || PALETTE.eye,
+            white: '#ffffff'
+        };
+    }
+
     // 在 (ox,oy) 畫一幀身體。f = 0..1 幀內相位;dir = 方向索引;pose = {bob, legSwing, armSwing, blink, knock}
-    function drawFrame(c, ox, oy, dir, pose) {
-        var P = PALETTE;
+    function drawFrame(c, ox, oy, dir, pose, P, hairStyle) {
         var bob = pose.bob | 0;              // 身體上下浮動
         var leg = pose.legSwing;             // 腿擺幅(-2..2)
         var arm = pose.armSwing;              // 手臂擺幅
@@ -53,10 +78,25 @@
 
         // ---- 頭(14x12,置中)----
         var hx = cx - 7;
-        // 頭髮後層(長髮披垂,左向/右向時偏向一側)
+        // 頭髮後層(依髮型像素變化)
         var backX = (dir === 2) ? hx + 3 : (dir === 3) ? hx - 3 : hx - 2;
-        px(c, backX - 1, top + 2, 3, 14, P.hairDark);          // 左髮束
-        px(c, hx + 12, top + 2, 3, 14, P.hairDark);            // 右髮束
+        if (hairStyle === 'twin') {
+            px(c, backX - 1, top + 2, 3, 9, P.hairDark);
+            px(c, hx + 12, top + 2, 3, 9, P.hairDark);
+            px(c, backX - 4, top + 8, 4, 8, P.hair);   // 左馬尾
+            px(c, hx + 13, top + 8, 4, 8, P.hair);     // 右馬尾
+        } else if (hairStyle === 'bun') {
+            px(c, backX - 1, top + 2, 3, 8, P.hairDark);
+            px(c, hx + 12, top + 2, 3, 8, P.hairDark);
+            px(c, cx - 5, top - 6, 10, 5, P.hair);     // 髮髻
+            px(c, cx - 3, top - 7, 6, 2, P.hairDark);  // 髮髻陰影
+        } else if (hairStyle === 'short') {
+            px(c, backX - 1, top + 2, 3, 6, P.hairDark);
+            px(c, hx + 12, top + 2, 3, 6, P.hairDark);
+        } else { // long(預設)
+            px(c, backX - 1, top + 2, 3, 14, P.hairDark);
+            px(c, hx + 12, top + 2, 3, 14, P.hairDark);
+        }
         // 臉
         px(c, hx, top, 14, 12, P.skin);
         px(c, hx, top + 10, 14, 2, P.skinShadow);
@@ -133,7 +173,7 @@
     }
 
     // 生成 sprite sheet 離屏 canvas
-    function buildSheet() {
+    function buildSheet(P, hairStyle) {
         var cv = document.createElement('canvas');
         var cols = Math.max.apply(null, [STATES.idle, STATES.run, STATES.hurt, STATES.dead]); // 6
         cv.width = cols * FW;
@@ -153,21 +193,41 @@
                         // 死亡幀:整體透明度漸暗
                         c.globalAlpha = 1 - 0.15 * f;
                     }
-                    drawFrame(c, f * FW, row * FH, d, { bob: p.bob, legSwing: p.leg, armSwing: p.arm, blink: p.blink, knock: p.knock });
+                    drawFrame(c, f * FW, row * FH, d, { bob: p.bob, legSwing: p.leg, armSwing: p.arm, blink: p.blink, knock: p.knock }, P, hairStyle || 'long');
                     c.restore();
                 }
                 row++;
             }
             rowMap[st] = rows;
         });
-        sheet = { canvas: cv, rowMap: rowMap, cols: cols };
-        return sheet;
+        return { canvas: cv, rowMap: rowMap, cols: cols };
     }
 
-    function getSheet() { return sheet || buildSheet(); }
+    // 取得角色的 sprite sheet:charId 為 null → 預設橘雪莉;否則依 CHARACTERS 配色/髮型生成(含快取)
+    function getSheetFor(charId) {
+        var key = charId || '__default__';
+        if (sheetCache[key]) return sheetCache[key];
+        var P = PALETTE, hair = 'long';
+        if (charId && typeof CHARACTERS !== 'undefined') {
+            var ch = null;
+            for (var i = 0; i < CHARACTERS.length; i++) {
+                if (CHARACTERS[i].id === charId) { ch = CHARACTERS[i]; break; }
+            }
+            if (ch) {
+                P = paletteFromChar(ch);
+                hair = ch.hairStyle || 'long';
+            }
+        }
+        sheetCache[key] = buildSheet(P, hair);
+        return sheetCache[key];
+    }
+
+    function getSheet() { return getSheetFor(null); }
 
     // ===== CharacterAnim:狀態機 + 幀調度 =====
-    function CharacterAnim() {
+    // v2:建構時可傳入角色 id,該動畫物件即以該角色外觀繪製(多人遠端玩家預設為橘雪莉)。
+    function CharacterAnim(charId) {
+        this.charId = charId || null;
         this.state = 'idle';
         this.stateTime = 0;
         this.frameTime = 0;
@@ -177,6 +237,10 @@
         this.deadLocked = false;
         this.lastDir = 'down';
     }
+
+    CharacterAnim.prototype.setCharId = function (id) {
+        this.charId = id || null;
+    };
 
     CharacterAnim.prototype.setState = function (st) {
         if (this.state === st) return;
@@ -231,7 +295,7 @@
 
     // 繪製到主 ctx:x,y = 世界座標(會自動扣 camera),scale = 放大倍率
     CharacterAnim.prototype.draw = function (ctx, x, y, camera, scale, moving) {
-        var s = getSheet();
+        var s = getSheetFor(this.charId);
         var st = this.state;
         var dir = DIRS.indexOf(this.lastDir);
         var row = s.rowMap[st][dir];
@@ -272,7 +336,8 @@
                 Math.round(x - camera.x - FW * sc / 2), Math.round(y - camera.y - FH * sc / 2), FW * sc, FH * sc);
         },
         PALETTE: PALETTE,
-        buildSheet: buildSheet
+        buildSheet: buildSheet,
+        getSheetFor: getSheetFor
     };
     global.CharacterAnim = CharacterAnim;
 })(window);

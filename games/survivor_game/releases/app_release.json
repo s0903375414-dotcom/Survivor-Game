@@ -1,10 +1,10 @@
 {
-  "version": "1.4",
-  "versionCode": 6,
-  "notes": "預設伺服器改為正式站 https://survivor-game-w2m3.onrender.com，開啟遊戲不再跳伺服器輸入框",
+  "version": "1.5",
+  "versionCode": 7,
+  "notes": "立繪全面重繪（可愛化五官+每角差異化）、各角色專屬像素模型、裝備角色遊戲內變身、抽卡稀有度揭示+翻牌動畫",
   "apkPath": "releases/survivor-game.apk",
   "apkUrl": "/app/apk",
   "fileName": "survivor-game.apk",
-  "size": 12350894,
-  "releasedAt": "2026-10-24T02:28:52.130Z"
+  "size": 12358006,
+  "releasedAt": "2026-10-24T09:58:24.187Z"
 }

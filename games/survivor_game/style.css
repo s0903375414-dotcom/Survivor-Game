@@ -2277,14 +2277,15 @@ h1 {
 .gacha-actions button:disabled { opacity: .4; cursor: not-allowed; }
 .gacha-result { position: relative; min-height: 120px; margin-bottom: 10px; }
 .gacha-cards { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-.gacha-card { position: relative; width: 96px; padding: 8px 6px 30px; border: 2px solid #555; border-radius: 10px; background: rgba(255,255,255,.06); text-align: center; opacity: 0; animation: gachaCardIn .5s cubic-bezier(.2,.9,.3,1.4) both; }
+.gacha-card { position: relative; width: 96px; padding: 8px 6px 30px; border: 2px solid #555; border-radius: 10px; background: rgba(255,255,255,.06); text-align: center; opacity: 0; animation: gachaFlipIn .55s cubic-bezier(.2,.85,.3,1.25) both; }
 .gacha-card-img { width: 64px; height: 80px; image-rendering: pixelated; }
 .gacha-card-name { font-size: .85em; margin-top: 4px; }
 .gacha-card-rarity { font-size: .75em; opacity: .8; letter-spacing: 2px; }
 .gacha-card.rarity-N { border-color: #8b9aa9; }
 .gacha-card.rarity-R { border-color: #4aa3ff; box-shadow: 0 0 8px rgba(74,163,255,.35); }
 .gacha-card.rarity-SR { border-color: #c07bff; box-shadow: 0 0 10px rgba(192,123,255,.5); }
-.gacha-card.ssr-card { border-color: #ffd700; box-shadow: 0 0 18px rgba(255,215,0,.75); animation: gachaCardIn .5s cubic-bezier(.2,.9,.3,1.4) both, gachaSSRpulse .9s ease .55s 2; }
+.gacha-card.ssr-card { border-color: #ffd700; box-shadow: 0 0 18px rgba(255,215,0,.75); animation: gachaFlipIn .55s cubic-bezier(.2,.85,.3,1.25) both, gachaSSRpulse .9s ease .55s 2; }
+.gacha-card.ssr-card::after { content: ''; position: absolute; inset: -45%; border-radius: 50%; z-index: -1; opacity: .85; pointer-events: none; animation: gachaRays 3.2s linear .2s infinite; background: conic-gradient(from 0deg, rgba(255,215,0,0) 0deg, rgba(255,215,0,.3) 12deg, rgba(255,215,0,0) 24deg, rgba(255,215,0,0) 44deg, rgba(255,215,0,.3) 56deg, rgba(255,215,0,0) 68deg, rgba(255,215,0,0) 100deg, rgba(255,215,0,.24) 112deg, rgba(255,215,0,0) 124deg, rgba(255,215,0,0) 172deg, rgba(255,215,0,.3) 184deg, rgba(255,215,0,0) 196deg, rgba(255,215,0,0) 232deg, rgba(255,215,0,.24) 244deg, rgba(255,215,0,0) 256deg, rgba(255,215,0,0) 302deg, rgba(255,215,0,.3) 314deg, rgba(255,215,0,0) 326deg); }
 .gacha-badge { position: absolute; top: -9px; right: -6px; padding: 2px 7px; border-radius: 10px; font-size: .7em; font-weight: 700; }
 .badge-new { background: #22c55e; color: #fff; }
 .badge-dupe { background: #64748b; color: #fff; }
@@ -2301,6 +2302,19 @@ h1 {
 .gacha-own-rarity { font-size: .7em; opacity: .75; }
 @keyframes gachaCardIn { from { opacity: 0; transform: translateY(18px) scale(.6) rotate(4deg); } to { opacity: 1; transform: none; } }
 @keyframes gachaSSRpulse { 0%, 100% { transform: none; } 35% { transform: scale(1.12); } 60% { transform: scale(.97); } }
+
+/* ===== 抽卡動畫 v2:稀有度揭示 + 3D 翻牌 + SSR 旋轉光束 ===== */
+.gacha-result { position: relative; }
+.gacha-reveal { position: absolute; inset: -14px; z-index: 6; border-radius: 18px; pointer-events: none; animation: gachaReveal .8s ease-out both; }
+.gacha-reveal.reveal-SSR { background: radial-gradient(circle, rgba(255,215,0,.85) 0%, rgba(255,215,0,.18) 45%, transparent 68%); }
+.gacha-reveal.reveal-SR { background: radial-gradient(circle, rgba(192,123,255,.75) 0%, rgba(192,123,255,.14) 45%, transparent 68%); }
+.gacha-reveal.reveal-R { background: radial-gradient(circle, rgba(74,163,255,.6) 0%, transparent 62%); }
+.gacha-reveal.reveal-N { background: radial-gradient(circle, rgba(180,193,209,.45) 0%, transparent 60%); }
+.gacha-reveal::after { content: ''; position: absolute; inset: 18%; border: 2px solid rgba(255,255,255,.75); border-radius: 50%; animation: gachaRevealRing .8s cubic-bezier(.1,.7,.3,1) both; }
+@keyframes gachaReveal { 0% { opacity: 0; } 14% { opacity: 1; } 62% { opacity: .9; } 100% { opacity: 0; } }
+@keyframes gachaRevealRing { 0% { transform: scale(.2); opacity: .95; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes gachaFlipIn { from { opacity: 0; transform: perspective(700px) rotateY(100deg) translateY(10px) scale(.72); } 60% { opacity: 1; } to { opacity: 1; transform: perspective(700px) rotateY(0deg) translateY(0) scale(1); } }
+@keyframes gachaRays { to { transform: rotate(360deg); } }
 @keyframes gachaFlash { from { opacity: 1; } to { opacity: 0; } }
 
 /* ===== 角色詳情面板(原創背景故事檢視) ===== */
