@@ -106,7 +106,7 @@ function saveSettings() {
     lsSet('survivor_settings', JSON.stringify(gameSettings));
     applySettings();
     settingsModal.classList.add('hidden');
-    createFloatingText(canvas.width/2, canvas.height/2, t('設定已儲存'), "#00ffff");
+    createFloatingText(VIEW.w/2, VIEW.h/2, t('設定已儲存'), "#00ffff");
 }
 
 // 語言切換接線:#setting-language → I18N.setLang() → localStorage + 全域套用
@@ -656,9 +656,20 @@ function playRadioVoice(text) {
     showNotification(text);
 }
 
+// 邏輯解析度(=視窗 CSS 像素);實體畫布 = 邏輯 × DPR → 手機全螢幕高解析度清晰渲染
+const VIEW = { w: window.innerWidth, h: window.innerHeight, dpr: 1 };
+
 function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5); // DPR 2.5 封頂,兼顧手機 GPU 效能
+    VIEW.w = window.innerWidth;
+    VIEW.h = window.innerHeight;
+    VIEW.dpr = dpr;
+    canvas.style.width = VIEW.w + 'px';
+    canvas.style.height = VIEW.h + 'px';
+    canvas.width = Math.round(VIEW.w * dpr);
+    canvas.height = Math.round(VIEW.h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 此後所有繪製座標維持「邏輯像素」,遊戲邏輯不變
+    if (typeof screenShake !== 'undefined' && screenShake > 0) screenShake = 0; // 避免舊 transform 殘留位移
 }
 
 const keys = {
@@ -1658,16 +1669,16 @@ function startMenuBackground() {
     for (let i = 0; i < 12; i++) {
         menuBgEntities.push({
             type: 'slime',
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
+            x: Math.random() * VIEW.w,
+            y: Math.random() * VIEW.h,
             vx: (Math.random() - 0.5) * 60,
             vy: (Math.random() - 0.5) * 60,
             r: 10 + Math.random() * 12
         });
     }
     menuBgPlayer = {
-        x: canvas.width / 2,
-        y: canvas.height / 2,
+        x: VIEW.w / 2,
+        y: VIEW.h / 2,
         angle: -Math.PI / 2
     };
     if (menuBgAnimationId) cancelAnimationFrame(menuBgAnimationId);
@@ -1686,7 +1697,7 @@ function menuBgLoop(timestamp) {
     const dt = Math.min(0.05, (timestamp - menuBgLastTime) / 1000);
     menuBgLastTime = timestamp;
     ctx.fillStyle = '#05070d';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, VIEW.w, VIEW.h);
     drawGrid();
     if (menuBgPlayer) {
         menuBgPlayer.angle += dt * 0.6;
@@ -1698,10 +1709,10 @@ function menuBgLoop(timestamp) {
     menuBgEntities.forEach(e => {
         e.x += e.vx * dt;
         e.y += e.vy * dt;
-        if (e.x < -100) e.x = canvas.width + 100;
-        if (e.x > canvas.width + 100) e.x = -100;
-        if (e.y < -100) e.y = canvas.height + 100;
-        if (e.y > canvas.height + 100) e.y = -100;
+        if (e.x < -100) e.x = VIEW.w + 100;
+        if (e.x > VIEW.w + 100) e.x = -100;
+        if (e.y < -100) e.y = VIEW.h + 100;
+        if (e.y > VIEW.h + 100) e.y = -100;
         ctx.save();
         ctx.translate(e.x, e.y);
         ctx.scale(1.15, 0.85);
@@ -2637,8 +2648,8 @@ class MultiplayerManager {
                 this.upgrades = { multishot: 0, fireRate: 0, damage: 0, speed: 0, hp: 0 };
                 this.airSupportReady = true;
                 this.airSupportCooldownEnd = 0;
-                camera.x = this.localX - canvas.width / 2;
-                camera.y = this.localY - canvas.height / 2;
+                camera.x = this.localX - VIEW.w / 2;
+                camera.y = this.localY - VIEW.h / 2;
                 
                 lobbyModal.classList.add('hidden');
                 startMultiplayer();
@@ -3087,7 +3098,7 @@ class MultiplayerManager {
         const now = Date.now();
         if (!this.lastSoundTime) this.lastSoundTime = 0;
         
-        let targetAngle = Math.atan2(mouseY - canvas.height/2, mouseX - canvas.width/2);
+        let targetAngle = Math.atan2(mouseY - VIEW.h/2, mouseX - VIEW.w/2);
         let hasEnemy = false;
 
         if (gameSettings.autoAim && this.enemies && this.enemies.length > 0) {
@@ -3232,7 +3243,7 @@ class MultiplayerManager {
             const dx = e.x - camera.x;
             const dy = e.y - camera.y;
             
-            if (dx < -200 || dx > canvas.width + 200 || dy < -200 || dy > canvas.height + 200) return;
+            if (dx < -200 || dx > VIEW.w + 200 || dy < -200 || dy > VIEW.h + 200) return;
             
             const typeCfg = SharedConfig.SLIME_TYPES[e.type] || SharedConfig.SLIME_TYPES.normal;
             const color = typeCfg.color;
@@ -3285,7 +3296,7 @@ class MultiplayerManager {
         this.bullets.forEach(b => {
             const dx = b.x - camera.x;
             const dy = b.y - camera.y;
-            if (dx < -50 || dx > canvas.width + 50 || dy < -50 || dy > canvas.height + 50) return;
+            if (dx < -50 || dx > VIEW.w + 50 || dy < -50 || dy > VIEW.h + 50) return;
             
             const r = 6;
             const hue = 180; 
@@ -3366,16 +3377,16 @@ class MultiplayerManager {
         ctx.strokeStyle = 'rgba(0, 255, 255, 0.08)';
         ctx.lineWidth = 1;
         
-        for (let x = offsetX; x < canvas.width; x += gridSize) {
+        for (let x = offsetX; x < VIEW.w; x += gridSize) {
             ctx.beginPath();
             ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvas.height);
+            ctx.lineTo(x, VIEW.h);
             ctx.stroke();
         }
-        for (let y = offsetY; y < canvas.height; y += gridSize) {
+        for (let y = offsetY; y < VIEW.h; y += gridSize) {
             ctx.beginPath();
             ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
+            ctx.lineTo(VIEW.w, y);
             ctx.stroke();
         }
     }
@@ -4445,7 +4456,7 @@ function launchAirStrike() {
     for(let i=0; i<3; i++) {
             setTimeout(() => {
                 const angle = Math.random() * Math.PI * 2;
-                const distance = canvas.width; // Start off screen
+                const distance = VIEW.w; // Start off screen
                 const startX = strikeX + Math.cos(angle) * distance;
                 const startY = strikeY + Math.sin(angle) * distance;
                 const endX = strikeX - Math.cos(angle) * distance;
@@ -4606,7 +4617,7 @@ function spawnEnemy() {
 
     // Spawn randomly around the player, just outside the view
     const angle = Math.random() * Math.PI * 2;
-    const radius = Math.hypot(canvas.width / 2, canvas.height / 2) + 100; 
+    const radius = Math.hypot(VIEW.w / 2, VIEW.h / 2) + 100; 
     
     let x = player.x + Math.cos(angle) * radius;
     let y = player.y + Math.sin(angle) * radius;
@@ -4627,11 +4638,11 @@ function updateCamera() {
     // Smoother camera follow using linear interpolation (lerp)
     let tx, ty;
     if (multiplayer.active) {
-        tx = multiplayer.localX - canvas.width / 2;
-        ty = multiplayer.localY - canvas.height / 2;
+        tx = multiplayer.localX - VIEW.w / 2;
+        ty = multiplayer.localY - VIEW.h / 2;
     } else {
-        tx = player.x - canvas.width / 2;
-        ty = player.y - canvas.height / 2;
+        tx = player.x - VIEW.w / 2;
+        ty = player.y - VIEW.h / 2;
     }
     
     camera.x += (tx - camera.x) * 0.1;
@@ -4649,23 +4660,23 @@ function drawGrid() {
     const startX = Math.floor(camera.x / gridSize) * gridSize;
     const startY = Math.floor(camera.y / gridSize) * gridSize;
 
-    for (let x = startX; x <= startX + canvas.width + gridSize; x += gridSize) {
+    for (let x = startX; x <= startX + VIEW.w + gridSize; x += gridSize) {
         ctx.beginPath();
         ctx.moveTo(x - camera.x, 0);
-        ctx.lineTo(x - camera.x, canvas.height);
+        ctx.lineTo(x - camera.x, VIEW.h);
         ctx.stroke();
     }
-    for (let y = startY; y <= startY + canvas.height + gridSize; y += gridSize) {
+    for (let y = startY; y <= startY + VIEW.h + gridSize; y += gridSize) {
         ctx.beginPath();
         ctx.moveTo(0, y - camera.y);
-        ctx.lineTo(canvas.width, y - camera.y);
+        ctx.lineTo(VIEW.w, y - camera.y);
         ctx.stroke();
     }
 
     // Layer 2: Glowing nodes at grid intersections
     ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
-    for (let x = startX; x <= startX + canvas.width + gridSize; x += gridSize) {
-        for (let y = startY; y <= startY + canvas.height + gridSize; y += gridSize) {
+    for (let x = startX; x <= startX + VIEW.w + gridSize; x += gridSize) {
+        for (let y = startY; y <= startY + VIEW.h + gridSize; y += gridSize) {
             ctx.beginPath();
             ctx.arc(x - camera.x, y - camera.y, 2, 0, Math.PI * 2);
             ctx.fill();
@@ -4789,7 +4800,7 @@ function animate() {
 
     // Clear with trail effect? No, clean clear for now
     ctx.fillStyle = 'rgba(26, 26, 26, 1)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, VIEW.w, VIEW.h);
     
     // Apply screen shake
     ctx.save();
@@ -4843,9 +4854,9 @@ function animate() {
         // Remove projectiles that are far outside the camera view
         const buffer = 200;
         if (projectile.x < camera.x - buffer ||
-            projectile.x > camera.x + canvas.width + buffer ||
+            projectile.x > camera.x + VIEW.w + buffer ||
             projectile.y < camera.y - buffer ||
-            projectile.y > camera.y + canvas.height + buffer) {
+            projectile.y > camera.y + VIEW.h + buffer) {
             projectiles.splice(i, 1);
         }
     }
@@ -5120,7 +5131,7 @@ function startMultiplayer() {
         updateTargeting();
         
         ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, VIEW.w, VIEW.h);
         
         ctx.save();
         if (screenShake > 0) {
@@ -5300,7 +5311,7 @@ function showMainMenu() {
     
     // Reset background
     ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, VIEW.w, VIEW.h);
     if (unitModal) {
         unitModal.classList.add('hidden');
     }
