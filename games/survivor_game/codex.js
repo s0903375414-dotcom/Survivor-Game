@@ -813,11 +813,16 @@
         ctx.restore();
 
         // ---------- 配件(依 accessory) ----------
-        if (accessory === 1) { // 呆毛
-            ctx.strokeStyle = P.hair; ctx.lineWidth = 14; ctx.lineCap = 'round';
+        if (accessory === 1) { // 呆毛(小捲曲,細線,髮梢收尾)
+            ctx.strokeStyle = P.hair; ctx.lineWidth = 11; ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(cx - 12, 236);
-            ctx.bezierCurveTo(cx - 40, 170, cx + 44, 150, cx + 58, 196);
+            ctx.moveTo(cx - 6, 240);
+            ctx.bezierCurveTo(cx - 26, 186, cx + 8, 152, cx + 42, 168);
+            ctx.stroke();
+            ctx.strokeStyle = hairDK; ctx.lineWidth = 9;
+            ctx.beginPath();
+            ctx.moveTo(cx + 36, 172);
+            ctx.quadraticCurveTo(cx + 54, 178, cx + 46, 198);
             ctx.stroke();
         } else if (accessory === 2) { // 髮夾(星形,取瞳色)
             drawStar(ctx, cx - 96, 330, 22, P.eye, 0.95);
@@ -859,8 +864,11 @@
         ctx.fillRect(0, 0, W, H);
     }
 
-    function renderArt(ch, rarity, width, height) {
-        var key = ch.id + '@' + (width || AR_W);
+    function renderArt(ch, rarity, width, height, mode) {
+        // mode: 'bust'(預設) = 胸部以上特寫 — 圖鑑卡片/詳情臉部清晰可辨;
+        //       'full' = 全身立繪 — 放大檢視用
+        var bust = (mode !== 'full');
+        var key = ch.id + '@' + (width || AR_W) + (bust ? 'b' : 'f');
         if (artCache[key]) return artCache[key];
         var cv = document.createElement('canvas');
         cv.width = AR_W * SS; cv.height = AR_H * SS;
@@ -875,13 +883,18 @@
         var octx = out.getContext('2d');
         octx.imageSmoothingEnabled = true;
         octx.imageSmoothingQuality = 'high';
-        octx.drawImage(cv, 0, 0, out.width, out.height);
+        if (bust) {
+            // 胸部以上特寫:自主畫布裁 (192,100,640,800) — 頭+肩 4:5 構圖,臉部在卡片上清晰可辨
+            octx.drawImage(cv, 192, 100, 640, 800, 0, 0, out.width, out.height);
+        } else {
+            octx.drawImage(cv, 0, 0, out.width, out.height);
+        }
         artCache[key] = out;
         return out;
     }
 
-    function artDataURL(ch, rarity, width, height) {
-        try { return renderArt(ch, rarity, width, height).toDataURL('image/png'); } catch (e) { return ''; }
+    function artDataURL(ch, rarity, width, height, mode) {
+        try { return renderArt(ch, rarity, width, height, mode).toDataURL('image/png'); } catch (e) { return ''; }
     }
 
     // ================= 圖鑑 UI =================
@@ -1005,7 +1018,7 @@
 
     function openCodexZoom(c) {
         if (!codexZoomEl || !codexZoomImg) return;
-        codexZoomImg.src = artDataURL(c, c.rarity, 512, 640);
+        codexZoomImg.src = artDataURL(c, c.rarity, 512, 640, 'full');
         codexZoomEl.classList.remove('hidden');
     }
 

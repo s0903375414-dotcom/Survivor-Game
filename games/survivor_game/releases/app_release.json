@@ -1,10 +1,10 @@
 {
-  "version": "1.6",
-  "versionCode": 8,
-  "notes": "手機全螢幕修復：DPR 高解析度渲染（畫面不再模糊）、沉浸式全螢幕（隱藏系統列）",
+  "version": "1.7",
+  "versionCode": 9,
+  "notes": "圖鑑卡片改為胸部以上特寫構圖——臉部大而清晰、修正呆毛繪製",
   "apkPath": "releases/survivor-game.apk",
   "apkUrl": "/app/apk",
   "fileName": "survivor-game.apk",
-  "size": 12358558,
-  "releasedAt": "2026-10-24T10:50:59.834Z"
+  "size": 12358862,
+  "releasedAt": "2026-10-24T13:52:11.752Z"
 }
