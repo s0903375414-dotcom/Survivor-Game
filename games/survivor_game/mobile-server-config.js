@@ -6,6 +6,9 @@
     if (root && root.window && root.document) api.configureNativeClient(root.window);
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
     const STORAGE_KEY = 'survivor-game-server-url';
+    // APK 預設伺服器:沒有 ?ws= 參數、也沒有已存位址時自動採用,
+    // 開啟遊戲不再跳輸入框。日後換伺服器:改這裡重新建置,或清 App 資料後用 ?ws= 參數覆蓋。
+    const DEFAULT_SERVER_ADDRESS = 'https://survivor-game-w2m3.onrender.com';
 
     function normalizeBackendAddress(value) {
         const input = String(value || '').trim();
@@ -27,8 +30,9 @@
         return `${protocol}//${parsed.host}`;
     }
 
-    function resolveBackendAddress({ queryAddress, storedAddress, promptForAddress } = {}) {
-        const candidate = queryAddress || storedAddress || (typeof promptForAddress === 'function' ? promptForAddress() : '');
+    function resolveBackendAddress({ queryAddress, storedAddress, defaultAddress, promptForAddress } = {}) {
+        const candidate = queryAddress || storedAddress || String(defaultAddress || '') ||
+            (typeof promptForAddress === 'function' ? promptForAddress() : '');
         if (!candidate) return null;
         return normalizeBackendAddress(candidate);
     }
@@ -48,6 +52,7 @@
             address = resolveBackendAddress({
                 queryAddress: params.get('ws'),
                 storedAddress,
+                defaultAddress: DEFAULT_SERVER_ADDRESS,
                 promptForAddress: () => win.prompt(
                     '請輸入遊戲伺服器位址。區網可填 http://電腦IP:8080（手機與電腦需連同一 Wi-Fi）。',
                     'http://'
@@ -65,5 +70,5 @@
         win.history.replaceState(null, '', nextUrl);
     }
 
-    return { STORAGE_KEY, normalizeBackendAddress, resolveBackendAddress, configureNativeClient };
+    return { STORAGE_KEY, DEFAULT_SERVER_ADDRESS, normalizeBackendAddress, resolveBackendAddress, configureNativeClient };
 });

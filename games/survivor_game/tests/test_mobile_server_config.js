@@ -27,20 +27,23 @@ check('blank addresses are rejected', () => throws(() => C.normalizeBackendAddre
 check('query address takes precedence over saved address', () => equal(C.resolveBackendAddress({ queryAddress: 'wss://one.example', storedAddress: 'ws://two.example' }), 'wss://one.example'));
 check('saved address avoids prompting again', () => equal(C.resolveBackendAddress({ storedAddress: 'http://192.168.1.20:8080', promptForAddress: () => { throw new Error('should not prompt'); } }), 'ws://192.168.1.20:8080'));
 check('missing address can be canceled without crashing', () => equal(C.resolveBackendAddress({ promptForAddress: () => null }), null));
-check('native app saves prompted address and passes it to WebSocket query', () => {
+check('default address is used without prompting (https → wss)', () => equal(C.resolveBackendAddress({ defaultAddress: C.DEFAULT_SERVER_ADDRESS, promptForAddress: () => { throw new Error('should not prompt'); } }), 'wss://survivor-game-w2m3.onrender.com'));
+check('saved address takes precedence over default', () => equal(C.resolveBackendAddress({ storedAddress: 'http://192.168.1.20:8080', defaultAddress: C.DEFAULT_SERVER_ADDRESS, promptForAddress: () => { throw new Error('should not prompt'); } }), 'ws://192.168.1.20:8080'));
+check('query address takes precedence over default', () => equal(C.resolveBackendAddress({ queryAddress: 'ws://lan.example:8080', defaultAddress: C.DEFAULT_SERVER_ADDRESS, promptForAddress: () => { throw new Error('should not prompt'); } }), 'ws://lan.example:8080'));
+check('native app auto-applies the default server without prompting', () => {
     let saved = '';
     let replaced = '';
     const win = {
         __SURVIVOR_ANDROID__: true,
         location: { search: '', pathname: '/index.html', hash: '' },
         localStorage: { getItem: () => '', setItem: (_, value) => { saved = value; } },
-        prompt: () => 'http://192.168.1.20:8080',
+        prompt: () => { throw new Error('prompt must not appear when default exists'); },
         alert: () => { throw new Error('unexpected alert'); },
         history: { replaceState: (_, __, url) => { replaced = url; } }
     };
     C.configureNativeClient(win);
-    equal(saved, 'ws://192.168.1.20:8080');
-    if (!replaced.includes('ws=ws%3A%2F%2F192.168.1.20%3A8080')) throw new Error(`query missing in ${replaced}`);
+    equal(saved, 'wss://survivor-game-w2m3.onrender.com');
+    if (!replaced.includes('ws=wss%3A%2F%2Fsurvivor-game-w2m3.onrender.com')) throw new Error(`query missing in ${replaced}`);
 });
 check('desktop browser is unchanged', () => {
     let prompted = false;

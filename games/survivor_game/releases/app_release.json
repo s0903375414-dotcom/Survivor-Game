@@ -1,10 +1,10 @@
 {
-  "version": "1.3",
-  "versionCode": 5,
-  "notes": "新功能：角色庫（出擊角色／支援單位）— 裝備已獲得的角色可獲得生命／傷害／移速加成；原單位配置入口升級為角色庫",
+  "version": "1.4",
+  "versionCode": 6,
+  "notes": "預設伺服器改為正式站 https://survivor-game-w2m3.onrender.com，開啟遊戲不再跳伺服器輸入框",
   "apkPath": "releases/survivor-game.apk",
   "apkUrl": "/app/apk",
   "fileName": "survivor-game.apk",
-  "size": 12350662,
-  "releasedAt": "2026-10-23T10:53:15.753Z"
+  "size": 12350894,
+  "releasedAt": "2026-10-24T02:28:52.130Z"
 }
